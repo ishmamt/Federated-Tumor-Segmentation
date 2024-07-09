@@ -1,0 +1,17 @@
+# Images
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.svg
+*.tiff
+
+# Model Checkpoints
+*.pt
+*.pth
+*.ckpt
+*.model
+
+# Data Folder and its contents
+data/
