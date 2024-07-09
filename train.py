@@ -18,11 +18,13 @@ def train(model, train_loader, optimizer, epochs, device):
             images, masks = images.to(device), masks.to(device)
             
             optimizer.zero_grad()
-            loss = criterion(model(images), masks)
+            outputs = model(images)
+            loss = criterion(outputs, masks)
+            iou, dice = iou_score(outputs, masks)
             loss.backward()
             optimizer.step()
             
-            loop.set_postfix({"loss": loss.item()})
+            loop.set_postfix({"IoU": iou, "Dice": dice, "loss": loss.item()})
 
 
 def test(model, test_loader, device):
@@ -43,7 +45,7 @@ def test(model, test_loader, device):
             total_dice += dice
             loss += criterion(outputs, masks).item()
             
-            loop.set_postfix({"IoU": iou, "Dice": dice})
+            loop.set_postfix({"IoU": iou, "Dice": dice, "loss": loss.item()})
     
     mean_iou = total_iou / len(test_loader.dataset)
     mean_dice = total_dice / len(test_loader.dataset)
