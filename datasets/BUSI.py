@@ -64,8 +64,6 @@ class BUSIDataset(Dataset):
         image_path = self.image_paths[idx]
         mask_path = self.mask_paths[idx]
         
-        print(image_path)
-        
         image = self.load_image(image_path)
         mask = self.load_mask(mask_path)
         

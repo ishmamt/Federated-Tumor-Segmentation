@@ -1,12 +1,12 @@
 import torch
-from torch.nn import BCEWithLogitsLoss
 from tqdm import tqdm
 
 from metrics import iou_score
+from loss import BCEDiceLoss
 
 
-def train(model, train_loader, optimizer, epochs, device):
-    criterion = BCEWithLogitsLoss()
+def train(model, train_loader, optimizer, scheduler, epochs, device):
+    criterion = BCEDiceLoss()
     model.train()
     model.to(device)
     
@@ -25,10 +25,12 @@ def train(model, train_loader, optimizer, epochs, device):
             optimizer.step()
             
             loop.set_postfix({"IoU": iou, "Dice": dice, "loss": loss.item()})
+        
+        scheduler.step()
 
 
 def test(model, test_loader, device):
-    criterion = BCEWithLogitsLoss()
+    criterion = BCEDiceLoss()
     total_iou, total_dice, loss = 0.0, 0.0, 0.0
     model.eval()
     model.to(device)
@@ -45,7 +47,7 @@ def test(model, test_loader, device):
             total_dice += dice
             loss += criterion(outputs, masks).item()
             
-            loop.set_postfix({"IoU": iou, "Dice": dice, "loss": loss.item()})
+            loop.set_postfix({"IoU": iou, "Dice": dice, "loss": loss})
     
     mean_iou = total_iou / len(test_loader.dataset)
     mean_dice = total_dice / len(test_loader.dataset)

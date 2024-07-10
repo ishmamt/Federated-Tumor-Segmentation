@@ -13,6 +13,7 @@ class DoubleConv(nn.Module):
         )
 
     def forward(self, x):
+        
         return self.conv_op(x)
 
 
@@ -38,6 +39,7 @@ class UpSample(nn.Module):
     def forward(self, x1, x2):
        x1 = self.up(x1)
        x = torch.cat([x1, x2], 1)
+       
        return self.conv(x)
    
 
@@ -72,4 +74,5 @@ class UNet(nn.Module):
        up_4 = self.up_convolution_4(up_3, down_1)
 
        out = self.out(up_4)
+       
        return out
