@@ -6,6 +6,8 @@ from omegaconf import OmegaConf, DictConfig
 
 from datasets.dataset import prepare_dataset
 from datasets.BUSI import BUSIDataset
+from client import generate_client_function
+
 from train import train, test
 from UNet import UNet
 from utils import show_image, Logger
@@ -24,6 +26,10 @@ def main(cfg: DictConfig):
     train_dataloaders, val_dataloaders, test_dataloader = prepare_dataset(dataset, cfg.batch_size, num_partitions=cfg.num_clients, 
                                                                           random_seed=cfg.random_seed, train_ratio=cfg.train_ratio, 
                                                                           val_ratio=cfg.val_ratio)
+    
+    # Define Clients
+    client_function = generate_client_function(train_dataloaders, val_dataloaders, cfg.input_channels, 
+                                               cfg.num_classes, cfg.random_seed)
     
     exit()
     
