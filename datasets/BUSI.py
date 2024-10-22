@@ -9,6 +9,15 @@ from torchvision import transforms
 
 class BUSIDataset(Dataset):
     def __init__(self, root_dir, image_size=512):
+        """
+        Creates the BUSI dataset.
+        
+        Arguments:
+        root_dir (str): Root directory of the dataset images folder.
+        image_size (int): Size of the image after transfomration.
+        """
+        
+        # Collecting all image paths and mask paths from the dataset folder
         all_images = glob.glob(os.path.join(root_dir, "**/*.png"), recursive=True)
         
         self.image_paths = list()
@@ -35,6 +44,16 @@ class BUSIDataset(Dataset):
             transforms.ToTensor()])
         
     def load_image(self, image_path):
+        """
+        Loads an image into a numpy array.
+        
+        Arguments:
+        image_path (str): Path to the image file.
+        
+        Returns:
+        image (numpy.ndarray): Numpy array representing the image.
+        """
+        
         image = cv2.imread(image_path)
         image = cv2.resize(image, (self.image_size, self.image_size))
         image = image[:, :, 0]  # Convert to grayscale
@@ -45,6 +64,16 @@ class BUSIDataset(Dataset):
         return image
     
     def load_mask(self, mask_path):
+        """
+        Loads a mask into a numpy array.
+        
+        Arguments:
+        mask_path (str): Path to the mask file.
+        
+        Returns:
+        mask (numpy.ndarray): Numpy array representing the mask.
+        """
+        
         mask = np.zeros((self.image_size, self.image_size), dtype=int)  # To combine multiple masks
 
         for path in mask_path:
@@ -58,9 +87,24 @@ class BUSIDataset(Dataset):
         return mask
     
     def __len__(self):
+        """
+        Pytorch Dataset method to get the number of samples in the dataset.
+        
+        Returns:
+        length (int): Number of samples in the dataset.
+        """
+        
         return len(self.image_paths)
     
     def __getitem__(self, idx):
+        """
+        Pytorch Dataset method to get a sample at a given index.
+        
+        Returns:
+        image (torch.Tensor): Image tensor.
+        mask (torch.Tensor): Mask tensor.
+        """
+        
         image_path = self.image_paths[idx]
         mask_path = self.mask_paths[idx]
         
