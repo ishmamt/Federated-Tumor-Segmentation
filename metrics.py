@@ -1,6 +1,6 @@
 import torch
 
-def iou_score(output, target, epsilon=1e-5):
+def iou_dice_score(output, target, epsilon=1e-5):
     if torch.is_tensor(output):
         output = torch.sigmoid(output).data.cpu().numpy()
     if torch.is_tensor(target):

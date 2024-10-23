@@ -1,23 +1,18 @@
-import torch
 import hydra
-from torch.optim import Adam
-from torch.optim import lr_scheduler
+import flwr as fl
 from omegaconf import OmegaConf, DictConfig
+from hydra.core.hydra_config import HydraConfig
+import os
+import pickle
 
 from datasets.dataset import prepare_dataset
 from datasets.BUSI import BUSIDataset
 from client import generate_client_function
-
-from train import train, test
-from UNet import UNet
-from utils import show_image, Logger
+from server import get_on_fit_config_function, get_eval_function
 
 
 @hydra.main(config_path="conf", config_name="base", version_base=None)
 def main(cfg: DictConfig):
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    logger = Logger(cfg.output_dir)
-    
     # Parse config file and print it out
     print(OmegaConf.to_yaml(cfg))
     
@@ -31,32 +26,47 @@ def main(cfg: DictConfig):
     client_function = generate_client_function(train_dataloaders, val_dataloaders, cfg.input_channels, 
                                                cfg.num_classes, cfg.random_seed)
     
-    exit()
+    #Define Strategy
+    strategy = fl.server.strategy.FedAvg(fraction_fit=0.0001, 
+                                         min_fit_clients=cfg.num_clients_per_round_fit, 
+                                         fraction_evaluate=0.0001, 
+                                         min_evaluate_clients=cfg.num_clients_per_round_eval, 
+                                         min_available_clients=cfg.num_clients, 
+                                         on_fit_config_fn=get_on_fit_config_function(cfg.config_fit),
+                                         evaluate_fn=get_eval_function(cfg.input_channels, cfg.num_classes, test_dataloader))
     
-    torch.manual_seed(cfg.random_seed)
-    model = UNet(in_channels=IN_CHANNELS, num_classes=NUM_CLASSES).to(DEVICE)
-    optimizer = Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=MIN_LR)
+    # Start Simulation
+    history = fl.simulation.start_simulation(
+        client_fn=client_function,
+        num_clients=cfg.num_clients,
+        config=fl.server.ServerConfig(num_rounds=cfg.num_rounds),
+        strategy=strategy,
+        client_resources={
+            "num_cpus": 2
+            # "num_gpus": 0.5
+        }
+    )
     
-    train(model, train_dataloader, val_dataloader, optimizer, scheduler, EPOCHS, DEVICE, logger)
-    loss, mean_iou, mean_dice = test(model, test_dataloader, DEVICE)
+    # Save simulation results
+    output_dir = HydraConfig.get().runtime.output_dir
+    results_output_dir = os.path.join(output_dir, "results.pkl")
+    results = {"history": history}
     
-    print("-" * 50)
-    print(f"Test loss: {loss}")
-    print(f"Test IoU: {mean_iou}")
-    print(f"Test Dice: {mean_dice}")
-    print("-" * 50)
+    with open(results_output_dir, 'wb') as f:
+        pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
     
-    model.eval()
-    model.to(DEVICE)
-    with torch.no_grad():
-        for images, masks in test_dataloader:
-            images, masks = images.to(DEVICE), masks.to(DEVICE)
-            outputs = model(images)
+
+    
+    # model.eval()
+    # model.to(DEVICE)
+    # with torch.no_grad():
+    #     for images, masks in test_dataloader:
+    #         images, masks = images.to(DEVICE), masks.to(DEVICE)
+    #         outputs = model(images)
             
-            output = outputs[0].detach().cpu().numpy()
-            mask = masks[0].detach().cpu().numpy()
-            show_image(mask, output)
+    #         output = outputs[0].detach().cpu().numpy()
+    #         mask = masks[0].detach().cpu().numpy()
+    #         show_image(mask, output)
       
             
 if __name__ == "__main__":

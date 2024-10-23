@@ -1,0 +1,14 @@
+[2024-10-23 22:44:25,240][flwr][INFO] - Starting Flower simulation, config: ServerConfig(num_rounds=3, round_timeout=None)
+[2024-10-23 22:44:29,697][flwr][INFO] - Flower VCE: Ray initialized with resources: {'object_store_memory': 2429037772.0, 'node:127.0.0.1': 1.0, 'memory': 4858075547.0, 'CPU': 18.0}
+[2024-10-23 22:44:29,697][flwr][INFO] - Initializing global parameters
+[2024-10-23 22:44:29,697][flwr][INFO] - Requesting initial parameters from one random client
+[2024-10-23 22:44:35,154][flwr][ERROR] - [36mray::launch_and_get_parameters()[39m (pid=4464, ip=127.0.0.1)
+  File "python\ray\_raylet.pyx", line 640, in ray._raylet.execute_task
+  File "python\ray\_raylet.pyx", line 644, in ray._raylet.execute_task
+  File "D:\Anaconda\envs\fl\lib\site-packages\flwr\simulation\ray_transport\ray_client_proxy.py", line 136, in launch_and_get_parameters
+    return maybe_call_get_parameters(
+  File "D:\Anaconda\envs\fl\lib\site-packages\flwr\client\client.py", line 163, in maybe_call_get_parameters
+    return client.get_parameters(get_parameters_ins)
+  File "D:\Anaconda\envs\fl\lib\site-packages\flwr\client\app.py", line 283, in _get_parameters
+    parameters = self.numpy_client.get_parameters(config=ins.config)  # type: ignore
+TypeError: get_parameters() got an unexpected keyword argument 'config'
