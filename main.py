@@ -7,8 +7,8 @@ import pickle
 
 from datasets.dataset import prepare_dataset
 from datasets.BUSI import BUSIDataset
-from client import generate_client_function
-from server import get_on_fit_config_function, get_eval_function
+from flower.client import generate_client_function
+from flower.server import get_on_fit_config_function, get_eval_function
 
 
 @hydra.main(config_path="conf", config_name="base", version_base=None)
