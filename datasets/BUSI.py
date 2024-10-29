@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
 
 
 class BUSIDataset(Dataset):
@@ -38,11 +37,7 @@ class BUSIDataset(Dataset):
                 current_image_mask_paths.append(mask_path_2)
             
             self.mask_paths.append(current_image_mask_paths)
-            
-        self.transform = transforms.Compose([
-            transforms.Resize((self.image_size, self.image_size)),
-            transforms.ToTensor()])
-        
+
     def load_image(self, image_path):
         """
         Loads an image into a numpy array.
@@ -99,6 +94,9 @@ class BUSIDataset(Dataset):
     def __getitem__(self, idx):
         """
         Pytorch Dataset method to get a sample at a given index.
+        
+        Arguments:
+        idx (int): Index of the sample to get.
         
         Returns:
         image (torch.Tensor): Image tensor.

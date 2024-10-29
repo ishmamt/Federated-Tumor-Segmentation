@@ -25,6 +25,7 @@ def prepare_dataset(dataset, batch_size, num_partitions, random_seed=42, train_r
         # Splitting train_dataset and val_dataset into partitions
         num_images = len(train_dataset) // num_partitions
         partition_len = [num_images] * num_partitions
+        partition_len[0] += (len(train_dataset) % num_partitions)  # Adding remaining images to the first partition
         train_datasets = random_split(train_dataset, partition_len, generator=generator)
         
         train_dataloaders = list()
