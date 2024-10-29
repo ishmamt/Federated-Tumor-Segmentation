@@ -1,6 +1,19 @@
 import torch
 
 def iou_dice_score(output, target, epsilon=1e-5):
+    """
+    Calculates Intersection over Union (IoU) and Dice Score for binary segmentation.
+    
+    Arguments:
+    output (Tensor): Output tensor (logits).
+    target (Tensor): Target tensor (binary mask).
+    epsilon (float): Smoothing factor for Dice score.
+    
+    Returns:
+    iou (float): Intersection over Union score.
+    dice (float): Dice Score.
+    """
+    
     if torch.is_tensor(output):
         output = torch.sigmoid(output).data.cpu().numpy()
     if torch.is_tensor(target):
@@ -18,6 +31,18 @@ def iou_dice_score(output, target, epsilon=1e-5):
 
 
 def dice_coef(output, target, epsilon=1e-5):
+    """
+    Calculates Dice Coefficient for binary segmentation.
+    
+    Arguments:
+    output (Tensor): Output tensor (logits).
+    target (Tensor): Target tensor (binary mask).
+    epsilon (float): Smoothing factor for Dice Coefficient.
+    
+    Returns:
+    dice (float): Dice Coefficient.
+    """
+    
     output = torch.sigmoid(output).view(-1).data.cpu().numpy()
     target = target.view(-1).data.cpu().numpy()
     
