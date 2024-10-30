@@ -1,16 +1,15 @@
 import os
 import numpy as np
 import cv2
-import h5py
 import torch
 from torch.utils.data import Dataset
 from multiprocessing import Pool
 
 
-class BRATSDataset(Dataset):
+class LiTSDataset(Dataset):
     def __init__(self, root_dir, image_size=512, target_threshold=5.0):
         """
-        Creates the BRATS dataset.
+        Creates the LiTS dataset.
 
         Arguments:
         root_dir (str): Root directory of the dataset images folder.
@@ -23,53 +22,60 @@ class BRATSDataset(Dataset):
         
         # Use a Pool to parallelize the process of keeping images with more than 5% non-zero pixels in the mask
         with Pool() as pool:
-            self.file_paths = pool.map(self.process_file, self.get_h5_files(root_dir))
+            self.image_mask_list = pool.map(self.process_file, self.get_image_mask_pairs(root_dir))
             
-        self.file_paths = [file for file in self.file_paths if file is not None]
+        self.image_mask_list = [file for file in self.image_mask_list if file is not None]
     
-    def get_h5_files(self, root_dir):
+    def get_image_mask_pairs(self, root_dir):
         """
-        Fetches all .h5 files from the specified directory.
+        Fetches all image mask pairs from the specified directory.
 
         Arguments:
         root_dir (str): Root directory of the dataset images folder.
 
         Returns:
-        h5_files (list): List of .h5 file paths.
+        image_mask_list (list): List of image mask pair file paths.
         """
         
-        return [os.path.join(root_dir, f) for f in os.listdir(root_dir) if f.endswith(".h5")]
+        images_dir = os.path.join(root_dir, "train_images", "train_images")
+        masks_dir = os.path.join(root_dir, "train_masks", "train_masks")
+        
+        image_mask_list = [{"image": os.path.join(images_dir, image_name), "mask": os.path.join(masks_dir, image_name)}
+        for image_name in os.listdir(images_dir) if image_name.endswith(".jpg") and os.path.exists(os.path.join(masks_dir, image_name))]
+        
+        return image_mask_list
     
-    def process_file(self, h5_file):
+    def process_file(self, image_mask_pair):
         """
         Only considers images with more than 5% non-zero pixels in the mask.
         
         Arguments:
-        h5_file (str): Path to the.h5 file.
+        image_mask_pair (dict): image mask pair file paths.
         
         Returns:
-        h5_file (str) or None: Path to the.h5 file or None if the image does not meet the criteria.
+        image_mask_pair (dict) or None: Paths to the image mask pair or None if the image does not meet the criteria.
         """
         
-        with h5py.File(h5_file, "r") as file:
-            mask = self.load_mask(file["mask"][()])
-            
-            if (((mask != 0).sum() / (self.image_size * self.image_size)) * 100) >= self.target_threshold:
-                return h5_file
-            else:
-                return None
+        mask = cv2.imread(image_mask_pair["mask"])
+        mask = np.where(mask == 2.0, 255.0, 0.0)  # The tumor is presented as 255 and the background as 0
+        
+        if (((mask != 0).sum() / (self.image_size * self.image_size)) * 100) >= self.target_threshold:
+            return image_mask_pair
+        else:
+            return None
     
-    def load_image(self, image):
+    def load_image(self, image_path):
         """
         Transforms the image into a numpy array.
         
         Arguments:
-        image (numpy.ndarray): Numpy array representing the image.
+        image_path (str): Path to the image file.
         
         Returns:
         image (numpy.ndarray): Numpy array representing the transformed image.
         """
         
+        image = cv2.imread(image_path)
         image = cv2.resize(image, (self.image_size, self.image_size))
         image = image[:, :, 0]  # Convert to grayscale
         image = image / 255.0
@@ -78,27 +84,25 @@ class BRATSDataset(Dataset):
         
         return image
     
-    def load_mask(self, mask):
+    def load_mask(self, mask_path):
         """
         Transforms the mask into a numpy array.
         
         Arguments:
-        mask (numpy.ndarray): Numpy array representing the mask.
+        mask_path (str): Path to the mask file.
         
         Returns:
         mask (numpy.ndarray): Numpy array representing the mask.
         """
 
-        mask = mask.transpose((2, 0, 1))
-        new_mask = np.zeros((self.image_size, self.image_size), dtype=int)  # To combine multiple masks
-
-        for cur_mask in [mask[0], mask[1], mask[2]]:
-            cur_mask = cv2.resize(cur_mask, (self.image_size, self.image_size))
-            new_mask[cur_mask != 0] = 1  # Combining multiple masks
-            
-        new_mask = np.expand_dims(new_mask, 0)  # Expand dimensions to include batch size 1
+        mask = cv2.imread(mask_path)
+        mask = np.where(mask == 2.0, 255.0, 0.0)  # The tumor is presented as 255 and the background as 0
+        mask = cv2.resize(mask, (self.image_size, self.image_size))
+        mask = mask / 255.0
+        mask = np.expand_dims(mask, 0)  # Expand dimensions to include batch size 1
+        mask = mask.astype(np.double)
         
-        return new_mask
+        return mask
         
     def __len__(self):
         """
@@ -108,7 +112,7 @@ class BRATSDataset(Dataset):
         length (int): Number of samples in the dataset.
         """
         
-        return len(self.file_paths)
+        return len(self.image_mask_list)
     
     def __getitem__(self, idx):
         """
@@ -116,14 +120,13 @@ class BRATSDataset(Dataset):
         
         Arguments:
         idx (int): Index of the sample to get.
-
+        
         Returns:
         image (torch.Tensor): Image tensor.
         mask (torch.Tensor): Mask tensor.
         """
-
-        with h5py.File(self.file_paths[idx], "r") as file:
-            image = self.load_image(file["image"][()])
-            mask = self.load_mask(file["mask"][()])
-            
+        
+        image = self.load_image(self.image_mask_list[idx]["image"])
+        mask = self.load_mask(self.image_mask_list[idx]["mask"])
+        
         return torch.Tensor(image), torch.Tensor(mask)
