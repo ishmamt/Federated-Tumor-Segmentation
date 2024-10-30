@@ -4,7 +4,6 @@ import cv2
 import h5py
 import torch
 from torch.utils.data import Dataset
-import matplotlib.pyplot as plt
 from multiprocessing import Pool
 
 
@@ -18,7 +17,6 @@ class BRATSDataset(Dataset):
         image_size (int): Size of the image after transfomration.
         """
         
-        self.file_paths = list()
         self.image_size = image_size
         
         # Use a Pool to parallelize the process of keeping images with more than 5% non-zero pixels in the mask
@@ -52,7 +50,7 @@ class BRATSDataset(Dataset):
         """
         
         with h5py.File(h5_file, "r") as file:
-            mask = self.load_mask(file['mask'][()])
+            mask = self.load_mask(file["mask"][()])
             
             if (((mask != 0).sum() / (self.image_size * self.image_size)) * 100) >= 5.0:
                 return h5_file
@@ -127,46 +125,3 @@ class BRATSDataset(Dataset):
             mask = self.load_mask(file["mask"][()])
             
         return torch.Tensor(image), torch.Tensor(mask)
-    
-def show_image(img, msk, labels=["mask"], semantic=False, threshold=False):
-    """
-    Displays an image and its corresponding mask.
-    
-    Arguments:
-    img (np.ndarray): Input image.
-    msk (np.ndarray): Input mask.
-    labels (list): Labels for the mask channels.
-    semantic (bool): Whether the mask represents semantic segmentation.
-    threshold (bool): Whether the mask represents thresholding.
-    """
-    
-    fig, axs = plt.subplots(1, 1 + len(labels), figsize=(8, 3))
-    img = np.squeeze(img)
-
-    axs[0].imshow(img, cmap='gray')
-    axs[0].set_title("image")
-
-    for i in range(len(labels)):
-        if semantic and threshold:
-            # Create a binary mask based on the channel with the highest value
-            binary_mask = np.argmax(msk, axis=0) == i
-            axs[i + 1].imshow(binary_mask, vmin=0, vmax=1, cmap='gray')
-        else:
-            axs[i + 1].imshow(msk[i], vmin=0, vmax=1, cmap='gray')
-        axs[i + 1].set_title(f"{labels[i]}")
-
-    plt.show()
-
-if __name__ == "__main__":
-    import time
-    # directory = os.path.join('..', 'BraTS2020_training_data', 'content', 'data')
-    directory = "G:/federatedLearningDatasets/BraTS2020_training_data/content/data"
-    start_time = time.time()
-    train_dataset = BRATSDataset(directory, 128)
-    end_time = time.time()
-    print(f"Dataset created in {end_time - start_time:.2f} seconds")
-    print(len(train_dataset))
-
-    # for i in range(25):
-    #     image, mask = train_dataset[i]
-        # show_image(image, mask)
