@@ -5,6 +5,7 @@ import h5py
 import torch
 from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
+from multiprocessing import Pool
 
 
 class BRATSDataset(Dataset):
@@ -17,8 +18,14 @@ class BRATSDataset(Dataset):
         image_size (int): Size of the image after transfomration.
         """
         
-        self.file_paths = self.get_h5_files(root_dir)
+        self.file_paths = list()
         self.image_size = image_size
+        
+        # Use a Pool to parallelize the process of keeping images with more than 5% non-zero pixels in the mask
+        with Pool() as pool:
+            self.file_paths = pool.map(self.process_file, self.get_h5_files(root_dir))
+            
+        self.file_paths = [file for file in self.file_paths if file is not None]
     
     def get_h5_files(self, root_dir):
         """
@@ -31,7 +38,26 @@ class BRATSDataset(Dataset):
         h5_files (list): List of .h5 file paths.
         """
         
-        return [os.path.join(root_dir, f) for f in os.listdir(root_dir) if f.endswith('.h5')]
+        return [os.path.join(root_dir, f) for f in os.listdir(root_dir) if f.endswith(".h5")]
+    
+    def process_file(self, h5_file):
+        """
+        Only considers images with more than 5% non-zero pixels in the mask.
+        
+        Arguments:
+        h5_file (str): Path to the.h5 file.
+        
+        Returns:
+        h5_file (str) or None: Path to the.h5 file or None if the image does not meet the criteria.
+        """
+        
+        with h5py.File(h5_file, "r") as file:
+            mask = self.load_mask(file['mask'][()])
+            
+            if (((mask != 0).sum() / (self.image_size * self.image_size)) * 100) >= 5.0:
+                return h5_file
+            else:
+                return None
     
     def load_image(self, image):
         """
@@ -96,13 +122,13 @@ class BRATSDataset(Dataset):
         mask (torch.Tensor): Mask tensor.
         """
 
-        with h5py.File(self.file_paths[idx], 'r') as file:
-            image = self.load_image(file['image'][()])
-            mask = self.load_mask(file['mask'][()])
+        with h5py.File(self.file_paths[idx], "r") as file:
+            image = self.load_image(file["image"][()])
+            mask = self.load_mask(file["mask"][()])
             
         return torch.Tensor(image), torch.Tensor(mask)
     
-def show_image(img, msk, labels=['mask'], semantic=False, threshold=False):
+def show_image(img, msk, labels=["mask"], semantic=False, threshold=False):
     """
     Displays an image and its corresponding mask.
     
@@ -132,10 +158,15 @@ def show_image(img, msk, labels=['mask'], semantic=False, threshold=False):
     plt.show()
 
 if __name__ == "__main__":
+    import time
     # directory = os.path.join('..', 'BraTS2020_training_data', 'content', 'data')
     directory = "G:/federatedLearningDatasets/BraTS2020_training_data/content/data"
+    start_time = time.time()
     train_dataset = BRATSDataset(directory, 128)
+    end_time = time.time()
+    print(f"Dataset created in {end_time - start_time:.2f} seconds")
+    print(len(train_dataset))
 
-    for i in range(25):
-        image, mask = train_dataset[i]
-        show_image(image, mask)
+    # for i in range(25):
+    #     image, mask = train_dataset[i]
+        # show_image(image, mask)
