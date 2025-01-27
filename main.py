@@ -33,7 +33,8 @@ def main(cfg: DictConfig):
                                          min_evaluate_clients=cfg.num_clients_per_round_eval, 
                                          min_available_clients=cfg.num_clients, 
                                          on_fit_config_fn=get_on_fit_config_function(cfg.config_fit),
-                                         evaluate_fn=get_eval_function(cfg.input_channels, cfg.num_classes, test_dataloader))
+                                         evaluate_fn=get_eval_function(cfg.input_channels, cfg.num_classes, test_dataloader, 
+                                                                       cfg.random_seed))
     
     # Start Simulation
     history = fl.simulation.start_simulation(

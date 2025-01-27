@@ -36,7 +36,7 @@ def get_on_fit_config_function(cfg):
     return on_fit_config_function
 
 
-def get_eval_function(input_channels, num_classes, test_dataloader):
+def get_eval_function(input_channels, num_classes, test_dataloader, random_seed=42):
     """
     Provides an eval function which the server can evoke when trying to evaluate on the client.
     
@@ -63,7 +63,7 @@ def get_eval_function(input_channels, num_classes, test_dataloader):
         eval_metrics (dict): Additional evaluation metrics (IoU, Dice) to be sent to the server.
         """
         
-        model = UNet(in_channels=input_channels, num_classes=num_classes)
+        model = UNet(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         params_dict = zip(model.state_dict().keys(), params)

@@ -99,7 +99,7 @@ class UpSample(nn.Module):
    
 
 class UNet(nn.Module):
-    def __init__(self, in_channels, num_classes):
+    def __init__(self, in_channels, num_classes, random_seed):
         """
         Creates a UNet model for semantic segmentation.
         
@@ -122,6 +122,10 @@ class UNet(nn.Module):
         self.up_convolution_4 = UpSample(128, 64)
         
         self.out = nn.Conv2d(in_channels=64, out_channels=num_classes, kernel_size=1)
+        
+        # Apply weight initialization
+        generator = torch.Generator().manual_seed(random_seed)
+        self.initialize_weights(generator)
 
     def forward(self, x):
         """
@@ -149,3 +153,18 @@ class UNet(nn.Module):
         output = self.out(up_4)
         
         return output
+    
+    def initialize_weights(self, generator):
+        """
+        Initializes the weights of the model using Kaiming Normal initialization.
+        
+        Arguments:
+        generator (torch.Generator): Random number generator for replication.
+        """
+        
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight, nonlinearity='relu', generator=generator)
+                
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)

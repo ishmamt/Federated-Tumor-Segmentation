@@ -27,8 +27,7 @@ class FlowerClient(fl.client.NumPyClient):
         self.num_classes = num_classes
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        torch.manual_seed(random_seed)
-        self.model = UNet(in_channels=input_channels, num_classes=num_classes)
+        self.model = UNet(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
         
     def set_parameters(self, params):
         """
