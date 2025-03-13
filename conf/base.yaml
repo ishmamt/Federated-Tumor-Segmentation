@@ -1,7 +1,8 @@
 ---
 
+# General configurations
 num_rounds: 3
-num_clients: 2
+num_clients: 3
 batch_size: 16
 input_channels: 1
 num_classes: 1
@@ -10,11 +11,16 @@ num_clients_per_round_eval: 1
 image_size: 128
 random_seed: 42
 
+# Dataset configurations
 train_ratio: 0.8
 val_ratio: 0.2
-dataset_dir: "data/Dataset_BUSI_with_GT"
 output_dir: "outputs/"
+dataset_dirs: 
+  busi: "data/Dataset_BUSI_with_GT"
+  brats: "data/BRATS_Dataset/BraTS2020_training_data/content/data"
+  lits: "data/LITS_Dataset"
 
+# Client training configurations
 config_fit:
   lr: 0.001
   min_lr: 0.00001

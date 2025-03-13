@@ -14,7 +14,7 @@ class BRATSDataset(Dataset):
 
         Arguments:
         root_dir (str): Root directory of the dataset images folder.
-        image_size (int): Size of the image after transfomration.
+        image_size (int): Size of the image after transformation.
         target_threshold (float): Threshold for the percentage of target label (tumor) present in the image.
         """
         

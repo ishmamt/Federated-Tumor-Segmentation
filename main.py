@@ -1,11 +1,14 @@
 import hydra
 import flwr as fl
+from flwr.common.logger import log
+from logging import INFO
 from omegaconf import OmegaConf, DictConfig
 from hydra.core.hydra_config import HydraConfig
 import os
 import pickle
+import torch
 
-from datasets.dataset import prepare_dataset
+from datasets.dataset import prepare_datasets, load_datasets
 from datasets.BUSI import BUSIDataset
 from flower.client import generate_client_function
 from flower.server import get_on_fit_config_function, get_eval_function
@@ -16,11 +19,19 @@ def main(cfg: DictConfig):
     # Parse config file and print it out
     print(OmegaConf.to_yaml(cfg))
     
-    # Load Dataset
-    dataset = BUSIDataset(cfg.dataset_dir, image_size=cfg.image_size)
-    train_dataloaders, val_dataloaders, test_dataloader = prepare_dataset(dataset, cfg.batch_size, num_partitions=cfg.num_clients, 
+    # Check if CUDA is available and log it
+    if torch.cuda.is_available():
+        log(INFO, "Running on CUDA compatible GPU")
+    else:
+        log(INFO, "Running on CPU")
+    
+    # Load Datasets
+    datasets = load_datasets(cfg.dataset_dirs, cfg.image_size)
+    log(INFO, "Datasets loaded. Number of datasets: %s", len(datasets))
+    train_dataloaders, val_dataloaders, test_dataloaders = prepare_datasets(datasets, cfg.batch_size, num_clients=cfg.num_clients, 
                                                                           random_seed=cfg.random_seed, train_ratio=cfg.train_ratio, 
                                                                           val_ratio=cfg.val_ratio)
+    exit()
     
     # Define Clients
     client_function = generate_client_function(train_dataloaders, val_dataloaders, cfg.input_channels, 

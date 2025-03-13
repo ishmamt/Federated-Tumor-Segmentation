@@ -13,7 +13,7 @@ class BUSIDataset(Dataset):
         
         Arguments:
         root_dir (str): Root directory of the dataset images folder.
-        image_size (int): Size of the image after transfomration.
+        image_size (int): Size of the image after transformation.
         """
         
         # Collecting all image paths and mask paths from the dataset folder
