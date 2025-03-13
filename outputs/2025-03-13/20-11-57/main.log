@@ -1,0 +1,8 @@
+[2025-03-13 20:11:57,231][flwr][INFO] - Running on CPU
+[2025-03-13 20:13:56,850][flwr][INFO] - Datasets loaded. Number of datasets: 3
+[2025-03-13 20:13:56,874][flwr][INFO] - Starting Flower simulation, config: ServerConfig(num_rounds=3, round_timeout=None)
+[2025-03-13 20:14:01,756][flwr][INFO] - Flower VCE: Ray initialized with resources: {'memory': 3443439207.0, 'CPU': 18.0, 'object_store_memory': 1721719603.0, 'node:127.0.0.1': 1.0}
+[2025-03-13 20:14:01,764][flwr][INFO] - Initializing global parameters
+[2025-03-13 20:14:01,766][flwr][INFO] - Requesting initial parameters from one random client
+[2025-03-13 20:14:05,281][flwr][INFO] - Received initial parameters from one random client
+[2025-03-13 20:14:05,281][flwr][INFO] - Evaluating initial parameters

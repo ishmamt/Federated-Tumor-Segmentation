@@ -95,7 +95,7 @@ class LiTSDataset(Dataset):
         mask (numpy.ndarray): Numpy array representing the mask.
         """
 
-        mask = cv2.imread(mask_path)
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         mask = np.where(mask == 2.0, 255.0, 0.0)  # The tumor is presented as 255 and the background as 0
         mask = cv2.resize(mask, (self.image_size, self.image_size))
         mask = mask / 255.0

@@ -31,7 +31,7 @@ def main(cfg: DictConfig):
     train_dataloaders, val_dataloaders, test_dataloaders = prepare_datasets(datasets, cfg.batch_size, num_clients=cfg.num_clients, 
                                                                           random_seed=cfg.random_seed, train_ratio=cfg.train_ratio, 
                                                                           val_ratio=cfg.val_ratio)
-    exit()
+    # exit()
     
     # Define Clients
     client_function = generate_client_function(train_dataloaders, val_dataloaders, cfg.input_channels, 
@@ -44,7 +44,7 @@ def main(cfg: DictConfig):
                                          min_evaluate_clients=cfg.num_clients_per_round_eval, 
                                          min_available_clients=cfg.num_clients, 
                                          on_fit_config_fn=get_on_fit_config_function(cfg.config_fit),
-                                         evaluate_fn=get_eval_function(cfg.input_channels, cfg.num_classes, test_dataloader, 
+                                         evaluate_fn=get_eval_function(cfg.input_channels, cfg.num_classes, test_dataloaders, 
                                                                        cfg.random_seed))
     
     # Start Simulation
