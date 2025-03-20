@@ -1,0 +1,33 @@
+[2025-03-19 20:25:08,711][flwr][INFO] - Running on CUDA compatible GPU
+[2025-03-19 20:25:08,723][flwr][INFO] - Datasets loaded. Number of datasets: 1
+[2025-03-19 20:25:08,725][flwr][INFO] - Starting Flower simulation, config: ServerConfig(num_rounds=3, round_timeout=None)
+[2025-03-19 20:25:12,718][flwr][INFO] - Flower VCE: Ray initialized with resources: {'node:172.28.0.12': 1.0, 'node:__internal_head__': 1.0, 'CPU': 2.0, 'object_store_memory': 3970697625.0, 'accelerator_type:T4': 1.0, 'GPU': 1.0, 'memory': 7941395252.0}
+[2025-03-19 20:25:12,719][flwr][INFO] - Initializing global parameters
+[2025-03-19 20:25:12,719][flwr][INFO] - Requesting initial parameters from one random client
+[2025-03-19 20:25:25,453][flwr][INFO] - Received initial parameters from one random client
+[2025-03-19 20:25:25,454][flwr][INFO] - Evaluating initial parameters
+[2025-03-19 20:25:29,052][flwr][INFO] - initial parameters (loss, other metrics): 1.2980703115463257, {'iou': [0.0450002726880254], 'dice': [0.08568710649500512], 'loss': [1.2980703115463257]}
+[2025-03-19 20:25:29,053][flwr][INFO] - FL starting
+[2025-03-19 20:25:29,053][flwr][DEBUG] - fit_round 1: strategy sampled 1 clients (out of 1)
+[2025-03-19 20:25:39,668][flwr][DEBUG] - fit_round 1 received 1 results and 0 failures
+[2025-03-19 20:25:39,913][flwr][WARNING] - No fit_metrics_aggregation_fn provided
+[2025-03-19 20:25:41,438][flwr][INFO] - fit progress: (1, 1.1333351135253906, {'iou': [2.0232173198046733e-09], 'dice': [4.046434624775106e-09], 'loss': [1.1333351135253906]}, 12.384717939999973)
+[2025-03-19 20:25:41,438][flwr][DEBUG] - evaluate_round 1: strategy sampled 1 clients (out of 1)
+[2025-03-19 20:25:43,727][flwr][DEBUG] - evaluate_round 1 received 1 results and 0 failures
+[2025-03-19 20:25:43,727][flwr][WARNING] - No evaluate_metrics_aggregation_fn provided
+[2025-03-19 20:25:43,728][flwr][DEBUG] - fit_round 2: strategy sampled 1 clients (out of 1)
+[2025-03-19 20:25:54,053][flwr][DEBUG] - fit_round 2 received 1 results and 0 failures
+[2025-03-19 20:25:55,870][flwr][INFO] - fit progress: (2, 1.0367052555084229, {'iou': [2.0232173198046733e-09], 'dice': [4.046434624775106e-09], 'loss': [1.0367052555084229]}, 26.817017531000147)
+[2025-03-19 20:25:55,870][flwr][DEBUG] - evaluate_round 2: strategy sampled 1 clients (out of 1)
+[2025-03-19 20:25:58,282][flwr][DEBUG] - evaluate_round 2 received 1 results and 0 failures
+[2025-03-19 20:25:58,282][flwr][DEBUG] - fit_round 3: strategy sampled 1 clients (out of 1)
+[2025-03-19 20:26:08,420][flwr][DEBUG] - fit_round 3 received 1 results and 0 failures
+[2025-03-19 20:26:10,162][flwr][INFO] - fit progress: (3, 1.0356864929199219, {'iou': [2.0232173198046733e-09], 'dice': [4.046434624775106e-09], 'loss': [1.0356864929199219]}, 41.10949254000025)
+[2025-03-19 20:26:10,163][flwr][DEBUG] - evaluate_round 3: strategy sampled 1 clients (out of 1)
+[2025-03-19 20:26:12,336][flwr][DEBUG] - evaluate_round 3 received 1 results and 0 failures
+[2025-03-19 20:26:12,336][flwr][INFO] - FL finished in 43.28301556700035
+[2025-03-19 20:26:12,353][flwr][INFO] - app_fit: losses_distributed [(1, 1.1568117539087932), (2, 1.064322868982951), (3, 1.039804220199585)]
+[2025-03-19 20:26:12,354][flwr][INFO] - app_fit: metrics_distributed_fit {}
+[2025-03-19 20:26:12,354][flwr][INFO] - app_fit: metrics_distributed {}
+[2025-03-19 20:26:12,354][flwr][INFO] - app_fit: losses_centralized [(0, 1.2980703115463257), (1, 1.1333351135253906), (2, 1.0367052555084229), (3, 1.0356864929199219)]
+[2025-03-19 20:26:12,354][flwr][INFO] - app_fit: metrics_centralized {'iou': [(0, [0.0450002726880254]), (1, [2.0232173198046733e-09]), (2, [2.0232173198046733e-09]), (3, [2.0232173198046733e-09])], 'dice': [(0, [0.08568710649500512]), (1, [4.046434624775106e-09]), (2, [4.046434624775106e-09]), (3, [4.046434624775106e-09])], 'loss': [(0, [1.2980703115463257]), (1, [1.1333351135253906]), (2, [1.0367052555084229]), (3, [1.0356864929199219])]}

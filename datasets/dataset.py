@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, random_split
 from datasets.BUSI import BUSIDataset
 from datasets.BRATS import BRATSDataset
 from datasets.LiTS import LiTSDataset
+from datasets.CVCcolonDB import ColonDataset
 
 
 def prepare_datasets(datasets, batch_size, num_clients, random_seed=42, train_ratio=0.8, val_ratio=0.2):
@@ -67,5 +68,14 @@ def load_datasets(dataset_dirs, image_size):
             
         elif dataset_name == "lits":
             datasets.append(LiTSDataset(dataset_dirs[dataset_name], image_size))
-    
+        
+        elif dataset_name == 'colon':
+            datasets.append(ColonDataset(dataset_dirs[dataset_name],image_size))
+
+        elif dataset_name == 'colon1':
+            datasets.append(ColonDataset(dataset_dirs[dataset_name],image_size))
+
+        elif dataset_name == 'colon2':
+            datasets.append(ColonDataset(dataset_dirs[dataset_name],image_size))
+            
     return datasets
