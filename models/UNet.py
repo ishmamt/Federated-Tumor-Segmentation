@@ -118,80 +118,154 @@ class UpSample(nn.Module):
         return self.conv(x)
    
 
-class UNet(nn.Module):
-    def __init__(self, in_channels, num_classes, random_seed):
-        """
-        Creates a UNet model for semantic segmentation.
+# class UNet(nn.Module):
+#     def __init__(self, in_channels, num_classes, random_seed):
+#         """
+#         Creates a UNet model for semantic segmentation.
         
-        Arguments:
-        in_channels (int): Number of input channels.
-        num_classes (int): Number of classes in the dataset.
-        """
+#         Arguments:
+#         in_channels (int): Number of input channels.
+#         num_classes (int): Number of classes in the dataset.
+#         """
         
-        super().__init__()
-        self.down_convolution_1 = DownSample(in_channels, 64)
-        self.down_convolution_2 = DownSample(64, 128)
-        self.down_convolution_3 = DownSample(128, 256)
-        self.down_convolution_4 = DownSample(256, 512)
+#         super().__init__()
+#         self.down_convolution_1 = DownSample(in_channels, 64)
+#         self.down_convolution_2 = DownSample(64, 128)
+#         self.down_convolution_3 = DownSample(128, 256)
+#         self.down_convolution_4 = DownSample(256, 512)
 
-        self.bottle_neck = DoubleConv(512, 1024)
+#         self.bottle_neck = DoubleConv(512, 1024)
 
-        self.up_convolution_1 = UpSample(1024, 512)
-        self.up_convolution_2 = UpSample(512, 256)
-        self.up_convolution_3 = UpSample(256, 128)
-        self.up_convolution_4 = UpSample(128, 64)
+#         self.up_convolution_1 = UpSample(1024, 512)
+#         self.up_convolution_2 = UpSample(512, 256)
+#         self.up_convolution_3 = UpSample(256, 128)
+#         self.up_convolution_4 = UpSample(128, 64)
         
-        self.out = nn.Conv2d(in_channels=64, out_channels=num_classes, kernel_size=1)
+#         self.out = nn.Conv2d(in_channels=64, out_channels=num_classes, kernel_size=1)
         
-        # Apply weight initialization
-        generator = torch.Generator().manual_seed(random_seed)
-        self.initialize_weights(generator)
+#         # Apply weight initialization
+#         generator = torch.Generator().manual_seed(random_seed)
+#         self.initialize_weights(generator)
 
-    def forward(self, x):
-        """
-        Applies the UNet model to the input tensor.
+#     def forward(self, x):
+#         """
+#         Applies the UNet model to the input tensor.
         
-        Arguments:
-        x (Tensor): Input tensor.
+#         Arguments:
+#         x (Tensor): Input tensor.
         
-        Returns:
-        output (Tensor): Output tensor after applying the UNet model.
-        """
+#         Returns:
+#         output (Tensor): Output tensor after applying the UNet model.
+#         """
         
-        down_1, p1 = self.down_convolution_1(x)
-        down_2, p2 = self.down_convolution_2(p1)
-        down_3, p3 = self.down_convolution_3(p2)
-        down_4, p4 = self.down_convolution_4(p3)
+#         down_1, p1 = self.down_convolution_1(x)
+#         down_2, p2 = self.down_convolution_2(p1)
+#         down_3, p3 = self.down_convolution_3(p2)
+#         down_4, p4 = self.down_convolution_4(p3)
         
-        b = self.bottle_neck(p4)
+#         b = self.bottle_neck(p4)
         
-        up_1 = self.up_convolution_1(b, down_4)
-        up_2 = self.up_convolution_2(up_1, down_3)
-        up_3 = self.up_convolution_3(up_2, down_2)
-        up_4 = self.up_convolution_4(up_3, down_1)
+#         up_1 = self.up_convolution_1(b, down_4)
+#         up_2 = self.up_convolution_2(up_1, down_3)
+#         up_3 = self.up_convolution_3(up_2, down_2)
+#         up_4 = self.up_convolution_4(up_3, down_1)
         
-        output = self.out(up_4)
+#         output = self.out(up_4)
         
-        return output
+#         return output
     
-    def initialize_weights(self, generator):
-        """
-        Initializes the weights of the model using Kaiming Normal initialization.
+#     def initialize_weights(self, generator):
+#         """
+#         Initializes the weights of the model using Kaiming Normal initialization.
         
-        Arguments:
-        generator (torch.Generator): Random number generator for replication.
-        """
+#         Arguments:
+#         generator (torch.Generator): Random number generator for replication.
+#         """
         
-        for module in self.modules():
-            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
-                nn.init.kaiming_normal_(module.weight, nonlinearity='relu', generator=generator)
+#         for module in self.modules():
+#             if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+#                 nn.init.kaiming_normal_(module.weight, nonlinearity='relu', generator=generator)
                 
-                if module.bias is not None:
-                    nn.init.constant_(module.bias, 0)
+#                 if module.bias is not None:
+#                     nn.init.constant_(module.bias, 0)
 
 
 
-class UNetWithAdapter(nn.Module):
+# class UNetWithAdapter(nn.Module):
+#   def __init__(self, in_channels, num_classes, random_seed):
+#     """
+#     Creates a UNetWithAdapter model for semantic segmentation.
+
+#     Arguments:
+#     in_channels (int): Number of input channels.
+#     num_classes (int): Number of classes in the dataset.
+#     """
+
+#     super().__init__()
+#     self.down_convolution_1 = DownSample(in_channels, 64)
+#     self.down_convolution_2 = DownSample(64, 128)
+#     self.down_convolution_3 = DownSample(128, 256)
+#     self.down_convolution_4 = DownSample(256, 512)
+
+#     self.bottle_neck = DoubleConv(512, 1024)
+
+#     self.up_convolution_1 = UpSample(1024, 512)
+#     self.up_convolution_2 = UpSample(512, 256)
+#     self.up_convolution_3 = UpSample(256, 128)
+#     self.up_convolution_4 = UpSample(128, 64)
+#     self.adapter = SpatialAdapter(feature_size=64,spatial_dims=2)
+
+#     self.out = nn.Conv2d(in_channels=64, out_channels=num_classes, kernel_size=1)
+
+#     # Apply weight initialization
+#     generator = torch.Generator().manual_seed(random_seed)
+#     self.initialize_weights(generator)
+
+#   def forward(self, x):
+#     """
+#     Applies the UNet model to the input tensor.
+
+#     Arguments:
+#     x (Tensor): Input tensor.
+
+#     Returns:
+#     output (Tensor): Output tensor after applying the UNet model.
+#     """
+
+#     down_1, p1 = self.down_convolution_1(x)
+#     down_2, p2 = self.down_convolution_2(p1)
+#     down_3, p3 = self.down_convolution_3(p2)
+#     down_4, p4 = self.down_convolution_4(p3)
+
+#     b = self.bottle_neck(p4)
+
+#     up_1 = self.up_convolution_1(b, down_4)
+#     up_2 = self.up_convolution_2(up_1, down_3)
+#     up_3 = self.up_convolution_3(up_2, down_2)
+#     up_4 = self.up_convolution_4(up_3, down_1)
+
+#     adapted = self.adapter(up_4)
+
+#     output = self.out(adapted)
+
+#     return output
+
+#   def initialize_weights(self, generator):
+#     """
+#     Initializes the weights of the model using Kaiming Normal initialization.
+
+#     Arguments:
+#     generator (torch.Generator): Random number generator for replication.
+#     """
+
+#     for module in self.modules():
+#         if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+#             nn.init.kaiming_normal_(module.weight, nonlinearity='relu', generator=generator)
+            
+#             if module.bias is not None:
+#                 nn.init.constant_(module.bias, 0)
+    
+class SharedUnet(nn.Module):
   def __init__(self, in_channels, num_classes, random_seed):
     """
     Creates a UNetWithAdapter model for semantic segmentation.
@@ -213,9 +287,8 @@ class UNetWithAdapter(nn.Module):
     self.up_convolution_2 = UpSample(512, 256)
     self.up_convolution_3 = UpSample(256, 128)
     self.up_convolution_4 = UpSample(128, 64)
-    self.adapter = SpatialAdapter(feature_size=64,spatial_dims=2)
 
-    self.out = nn.Conv2d(in_channels=64, out_channels=num_classes, kernel_size=1)
+    self.featureSizeForAdapter = 64
 
     # Apply weight initialization
     generator = torch.Generator().manual_seed(random_seed)
@@ -244,7 +317,61 @@ class UNetWithAdapter(nn.Module):
     up_3 = self.up_convolution_3(up_2, down_2)
     up_4 = self.up_convolution_4(up_3, down_1)
 
-    adapted = self.adapter(up_4)
+    # adapted = self.adapter(up_4)
+
+    # output = self.out(adapted)
+
+    return up_4
+
+  def initialize_weights(self, generator):
+    """
+    Initializes the weights of the model using Kaiming Normal initialization.
+
+    Arguments:
+    generator (torch.Generator): Random number generator for replication.
+    """
+
+    for module in self.modules():
+        if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+            nn.init.kaiming_normal_(module.weight, nonlinearity='relu', generator=generator)
+            
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+
+
+
+class PersonalizedUnet(nn.Module):
+  def __init__(self, in_channels, num_classes, random_seed):
+    """
+    Creates a UNetWithAdapter model for semantic segmentation.
+
+    Arguments:
+    in_channels (int): Number of input channels.
+    num_classes (int): Number of classes in the dataset.
+    """
+
+    super().__init__()
+
+    self.adapter = SpatialAdapter(feature_size=in_channels,spatial_dims=2)
+
+    self.out = nn.Conv2d(in_channels=in_channels, out_channels=num_classes, kernel_size=1)
+
+    # Apply weight initialization
+    generator = torch.Generator().manual_seed(random_seed)
+    self.initialize_weights(generator)
+
+  def forward(self, x):
+    """
+    Applies the UNet model to the input tensor.
+
+    Arguments:
+    x (Tensor): Input tensor.
+
+    Returns:
+    output (Tensor): Output tensor after applying the UNet model.
+    """
+
+    adapted = self.adapter(x)
 
     output = self.out(adapted)
 
@@ -264,5 +391,3 @@ class UNetWithAdapter(nn.Module):
             
             if module.bias is not None:
                 nn.init.constant_(module.bias, 0)
-    
-    

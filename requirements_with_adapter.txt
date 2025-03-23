@@ -1,4 +1,4 @@
-flwr
+flwr==1.4.0
 hydra-core
 ray
 tqdm

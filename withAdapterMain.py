@@ -5,6 +5,7 @@ from logging import INFO
 from omegaconf import OmegaConf, DictConfig
 from hydra.core.hydra_config import HydraConfig
 import os
+import glob
 import pickle
 import torch
 
@@ -50,20 +51,31 @@ def main(cfg: DictConfig):
                                                                        cfg.random_seed))
     
     # Start Simulation
-    history = fl.simulation.start_simulation(
-        client_fn=client_function,
-        num_clients=cfg.num_clients,
-        config=fl.server.ServerConfig(num_rounds=cfg.num_rounds),
-        strategy=strategy,
-        client_resources={
-            "num_cpus": 2,
-            "num_gpus": 1
-        }
-    )
+    try:
+      history = fl.simulation.start_simulation(
+          client_fn=client_function,
+          num_clients=cfg.num_clients,
+          config=fl.server.ServerConfig(num_rounds=cfg.num_rounds),
+          strategy=strategy,
+          client_resources={
+              "num_cpus": 2,
+              "num_gpus": 1
+          }
+      )
+    except Exception as e:
+      print(f"While simulating an error has occured : {e}")
+    finally:
+      adapter_weight_paths = glob.glob('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/adapter_weight/*.pth')
+      for weight_path in adapter_weight_paths:
+        os.remove(weight_path)
+      exit()
     
     # Save simulation results
     output_dir = HydraConfig.get().runtime.output_dir
+    # output_dir = cfg.output_dir
     results_output_dir = os.path.join(output_dir, "results.pkl")
+    # print(f'results_output_dir : {results_output_dir}')
+    # exit()
     results = {"history": history}
     
     with open(results_output_dir, 'wb') as f:

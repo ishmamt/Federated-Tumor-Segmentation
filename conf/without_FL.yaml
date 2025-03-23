@@ -1,20 +1,20 @@
 ---
 
 # General configurations
-num_rounds: 3
+num_rounds: 200
 num_clients: 3
 batch_size: 16
 input_channels: 1
 num_classes: 1
-num_clients_per_round_fit: 1
-num_clients_per_round_eval: 1
+num_clients_per_round_fit: 3
+num_clients_per_round_eval: 3
 image_size: 128
 random_seed: 42
 
 # Dataset configurations
 train_ratio: 0.9
 val_ratio: 0.1
-output_dir: "outputs_without_FL/"
+output_dir: "/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/"
 dataset_dirs: 
   colon: "/content/drive/MyDrive/UFF/CVC-ColonDB"
   colon1: "/content/drive/MyDrive/UFF/CVC-ColonDB"
@@ -22,7 +22,7 @@ dataset_dirs:
 
 # Client training configurations
 config_fit:
-  lr: 0.001
+  lr: 0.0001
   min_lr: 0.00001
   weight_decay: 1e-4
   local_epochs: 1

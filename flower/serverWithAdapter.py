@@ -1,9 +1,10 @@
+import os
 import torch
 import numpy as np
 from collections import OrderedDict
 
-from models.UNet import UNetWithAdapter
-from train import test
+from models.UNet import SharedUnet,PersonalizedUnet
+from trainWithAdapter import test
 
 
 def get_on_fit_config_function(cfg):
@@ -68,15 +69,32 @@ def get_eval_function(input_channels, num_classes, test_dataloaders, random_seed
         iou_list = list()
         dice_list = list()
         
-        model = UNetWithAdapter(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
+        model = SharedUnet(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         params_dict = zip(model.state_dict().keys(), params)
         state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
         model.load_state_dict(state_dict, strict=True)
-        
-        for test_dataloader in test_dataloaders:
-            loss, iou, dice = test(model, test_dataloader, device)
+
+        numberOfAdapters = len(test_dataloaders)
+        adapters = []
+        for idx in range(numberOfAdapters):
+          adapter_weight_path = \
+          f'/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/adapter_weight/model{idx}.pth'
+          adapters.append(PersonalizedUnet(
+            in_channels = model.featureSizeForAdapter,
+            num_classes = num_classes,
+            random_seed = random_seed
+          ))
+
+          if os.path.exists(adapter_weight_path):
+              print("Loading saved adapter weights...")
+              adapters[-1].load_state_dict(torch.load(adapter_weight_path))
+          else:
+              print("No saved weights found, skipping adapter weight loading.")
+
+        for idx,test_dataloader in enumerate(test_dataloaders):
+            loss, iou, dice = test(model, adapters[idx], test_dataloader, device)
             
             loss_list.append(float(loss))
             iou_list.append(iou)

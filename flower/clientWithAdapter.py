@@ -1,15 +1,17 @@
+import os
 import flwr as fl
 import torch
 from collections import OrderedDict
 from torch.optim import Adam
 from torch.optim import lr_scheduler
 
-from models.UNet import UNetWithAdapter
-from train import train, test
+from models.UNet import SharedUnet,PersonalizedUnet
+# from train import train, test
+from trainWithAdapter import train, test
 
 
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, train_dataloader, val_dataloader, input_channels, num_classes, random_seed=42):
+    def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, random_seed=42):
         """
         Creates a FlowerClient object to simulate a client.
         
@@ -22,13 +24,32 @@ class FlowerClient(fl.client.NumPyClient):
         """
         
         super().__init__()
+        self.client_id = client_id
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.num_classes = num_classes
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        self.model = UNetWithAdapter(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
-        
+        self.model = SharedUnet(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
+        self.adapter = PersonalizedUnet(
+          in_channels = self.model.featureSizeForAdapter,
+          num_classes = num_classes,
+          random_seed = random_seed
+        )
+        ## Let's hardcode the model weight path for now
+        self.adapter_weight_path = \
+        f'/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/adapter_weight/model{self.client_id}.pth'
+        # if os.path.exists(self.adapter_weight_path):
+        #   os.remove(self.adapter_weight_path)
+
+    def set_parameters_adapter(self):
+      # Check if the file exists
+      if os.path.exists(self.adapter_weight_path):
+          print("Loading saved adapter weights...")
+          self.adapter.load_state_dict(torch.load(self.adapter_weight_path))
+      else:
+          print("No saved weights found, skipping loading.")
+
     def set_parameters(self, params):
         """
         Updates the model parameters using the given numpy arrays.
@@ -40,7 +61,10 @@ class FlowerClient(fl.client.NumPyClient):
         params_dict = zip(self.model.state_dict().keys(), params)
         state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
         self.model.load_state_dict(state_dict, strict=True)
-        
+
+    def get_parameters_adapter(self):
+        torch.save(self.adapter.state_dict(),self.adapter_weight_path)
+
     def get_parameters(self, config):
         """
         Returns the current model parameters as numpy arrays.
@@ -69,13 +93,28 @@ class FlowerClient(fl.client.NumPyClient):
         """
         
         self.set_parameters(params)  # Update model parameters from the server
-        
-        optimizer = Adam(self.model.parameters(), lr=cfg["lr"], weight_decay=cfg["weight_decay"])
+        self.set_parameters_adapter()
+
+        optimizer = Adam(
+            list(self.model.parameters())+list(self.adapter.parameters()), 
+            lr=cfg["lr"], 
+            weight_decay=cfg["weight_decay"]
+          )
         scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg["local_epochs"], eta_min=cfg["min_lr"])
         
         # Local training
-        history = train(self.model, self.train_dataloader, optimizer, scheduler, cfg["local_epochs"], self.device)
+        history = train(
+            self.model, 
+            self.adapter, 
+            self.train_dataloader, 
+            optimizer, 
+            scheduler, 
+            cfg["local_epochs"], 
+            self.device
+          )
         
+        self.get_parameters_adapter()
+
         # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
         return self.get_parameters({}), len(self.train_dataloader), {"history": history}
     
@@ -95,7 +134,12 @@ class FlowerClient(fl.client.NumPyClient):
         
         self.set_parameters(params)  # Update model parameters from the server
         
-        loss, iou, dice = test(self.model, self.val_dataloader, self.device)
+        loss, iou, dice = test(
+            self.model, 
+            self.adapter, 
+            self.val_dataloader, 
+            self.device
+          )
         
         return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
     
@@ -126,7 +170,7 @@ def generate_client_function(train_dataloaders, val_dataloaders, input_channels,
         client (FlowerClient): FlowerClient object for the specified client.
         """
         
-        return FlowerClient(train_dataloaders[int(client_id)], val_dataloaders[int(client_id)], 
+        return FlowerClient(int(client_id), train_dataloaders[int(client_id)], val_dataloaders[int(client_id)], 
                             input_channels, num_classes, random_seed)
     
     return client_function
