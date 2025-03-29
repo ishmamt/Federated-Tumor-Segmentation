@@ -1,0 +1,8 @@
+[2025-03-26 21:13:03,567][flwr][INFO] - Running on CUDA compatible GPU
+[2025-03-26 21:13:03,598][flwr][INFO] - Datasets loaded. Number of datasets: 3
+[2025-03-26 21:13:03,600][flwr][INFO] - Starting Flower simulation, config: ServerConfig(num_rounds=200, round_timeout=None)
+[2025-03-26 21:13:10,588][flwr][INFO] - Flower VCE: Ray initialized with resources: {'CPU': 2.0, 'GPU': 1.0, 'node:172.28.0.12': 1.0, 'node:__internal_head__': 1.0, 'accelerator_type:T4': 1.0, 'object_store_memory': 3986235801.0, 'memory': 9301216871.0}
+[2025-03-26 21:13:10,589][flwr][INFO] - Initializing global parameters
+[2025-03-26 21:13:10,589][flwr][INFO] - Requesting initial parameters from one random client
+[2025-03-26 21:13:23,031][flwr][INFO] - Received initial parameters from one random client
+[2025-03-26 21:13:23,031][flwr][INFO] - Evaluating initial parameters

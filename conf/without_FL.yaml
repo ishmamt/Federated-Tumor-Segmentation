@@ -22,7 +22,7 @@ dataset_dirs:
 
 # Client training configurations
 config_fit:
-  lr: 0.0001
-  min_lr: 0.00001
+  lr: 0.00001
+  min_lr: 0.000001
   weight_decay: 1e-4
   local_epochs: 1
