@@ -2,12 +2,12 @@ import os
 import flwr as fl
 import torch
 from collections import OrderedDict
-from torch.optim import Adam
+from torch.optim import Adam,AdamW
 from torch.optim import lr_scheduler
 
-from models.unetWithModifications import SharedUnet,PersonalizedUnet,\
-SharedDown,QGenerator,SharedUpWithAttn
-# from train import train, test
+from models.unetWithModifications import SharedUnet,PersonalizedUnet
+from models.unetGpt import UNetWithAttention
+from train import train, test
 from trainWithModifications import trainWithAdapter,testWithAdapter,\
 trainWithAttention, testWithAttention
 
@@ -15,7 +15,7 @@ trainWithAttention, testWithAttention
 class FlowerClientWithAttention(fl.client.NumPyClient):
   def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, random_seed=42):
       """
-      Creates a FlowerClient object to simulate a client.
+      Creates a FlowerClient with self attention module to simulate a client.
       
       Arguments:
       train_dataloader (DataLoader): DataLoader for training data on a single client.
@@ -32,33 +32,24 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
       self.num_classes = num_classes
       self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
       
-      self.modelDown = SharedDown(
-        in_channels=input_channels, 
-        random_seed=random_seed
+      self.model = UNetWithAttention(
+          in_channels = input_channels,
+          num_classes = num_classes
       )
-      outputChannelsOfModelDown = self.modelDown.output_channels
-      self.qGenerator = QGenerator(
-        in_channels = outputChannelsOfModelDown,
-        random_seed = random_seed
-      )
-      self.modelUp = SharedUpWithAttn(
-        in_channels = outputChannelsOfModelDown,
-        num_classes = num_classes,
-        random_seed = random_seed
-      )
-      ## Let's hardcode the model weight path for now
-      self.q_weight_path = \
-      f'/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/model{client_id}.pth'
-      # if os.path.exists(self.adapter_weight_path):
-      #   os.remove(self.adapter_weight_path)
 
-  def set_parameters_qGenerator(self):
-    # Check if the file exists
-    if os.path.exists(self.q_weight_path):
-        print("Loading saved qGenerator weights...")
-        self.qGenerator.load_state_dict(torch.load(self.q_weight_path))
-    else:
-        print("No saved weights found, skipping loading qGenerator.")
+      self.queryWeightsPath = f'queryWeights/query{self.client_id}.pth'
+  
+  def setQueryParameters(self):
+      
+      if os.path.exists(self.queryWeightsPath):
+          print('Loading query parameters')
+          try:
+            self.model.attn.query.load_state_dict(torch.load(self.queryWeightsPath))
+          except Exception as e:
+            print('Problem while loading query parameters')
+            exit()
+      else:
+          print('Query parameter not saved')
 
   def set_parameters(self, params):
       """
@@ -68,20 +59,16 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
       params (list): List of numpy arrays representing the model parameters.
       """
       
-      num_params_down = len(list(self.modelDown.parameters()))
-      params_down = params[:num_params_down]  # First half for Model A
-      params_up = params[num_params_down:]  # Second half for Model B
-
-      # Load into Model A
-      for param, model_param in zip(params_down, self.modelDown.parameters()):
-          model_param.data = torch.tensor(param)
-
-      # Load into Model B
-      for param, model_param in zip(params_up, self.modelUp.parameters()):
-          model_param.data = torch.tensor(param)
-
-  def get_parameters_qGenerator(self):
-      torch.save(self.qGenerator.state_dict(),self.q_weight_path)
+      params_dict = zip(self.model.state_dict().keys(), params)
+      state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+      self.model.load_state_dict(state_dict, strict=True)
+  
+  def getQueryParameters(self):
+      print('saving query weights')
+      try:
+        torch.save(self.model.attn.query.state_dict(), self.queryWeightsPath)
+      except Exception as e:
+        print('Exception while saving query weights')
 
   def get_parameters(self, config):
       """
@@ -93,12 +80,7 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
       Returns:
       params (list): List of numpy arrays representing the model parameters.
       """
-      
-      # params_down = [p.cpu().clone().detach().numpy() for p in self.modelDown.parameters()]
-      # params_up = [p.cpu().clone().detach().numpy() for p in self.modelUp.parameters()]
-      # return params_down + params_up  # Flatten into one list
-      return [val.cpu().numpy() for _, val in self.modelDown.state_dict().items()]+\
-      [val.cpu().numpy() for _, val in self.modelUp.state_dict().items()]
+      return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
   
   def fit(self, params, cfg):
       """
@@ -115,28 +97,27 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
       """
       
       self.set_parameters(params)  # Update model parameters from the server
-      self.set_parameters_qGenerator()
+      self.setQueryParameters()
 
-      optimizer = Adam(
-          list(self.modelDown.parameters())+
-          list(self.qGenerator.parameters())+
-          list(self.modelUp.parameters()), 
-          lr=cfg["lr"], 
-          weight_decay=cfg["weight_decay"]
-        )
-      scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg["local_epochs"], eta_min=cfg["min_lr"])
+      optimizer = AdamW(self.model.parameters(), lr=cfg['lr'], weight_decay=cfg['weight_decay'])
+      scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, 
+        T_0=10, 
+        T_mult=2, 
+        eta_min=cfg['min_lr']
+      )
       
       # Local training
-      history = trainWithAttention(
-          (self.modelDown,self.qGenerator,self.modelUp), 
-          self.train_dataloader, 
-          optimizer, 
-          scheduler, 
-          cfg["local_epochs"], 
-          self.device
+      history = train(
+          model = self.model,
+          train_dataloader = self.train_dataloader, 
+          optimizer = optimizer, 
+          scheduler = scheduler, 
+          epochs = cfg["local_epochs"], 
+          device = self.device
         )
       
-      self.get_parameters_qGenerator()
+      self.getQueryParameters()
 
       # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
       return self.get_parameters({}), len(self.train_dataloader), {"history": history}
@@ -157,8 +138,8 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
       
       self.set_parameters(params)  # Update model parameters from the server
       
-      loss, iou, dice = testWithAttention(
-          (self.modelDown,self.qGenerator,self.modelUp), 
+      loss, iou, dice = test(
+          self.model, 
           self.val_dataloader, 
           self.device
         )

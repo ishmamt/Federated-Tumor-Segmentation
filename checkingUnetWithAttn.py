@@ -21,7 +21,7 @@ if __name__ == '__main__':
   # print(y.shape) 
 
   datasets = load_datasets(
-    {'colon' : "/content/drive/MyDrive/UFF/CVC-ColonDB"}, 
+    {'colon' : "CVC-ColonDB"}, 
     128
   )
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     train_dataloader = train_dataloaders[-1],
     optimizer = optimizer,
     scheduler = scheduler,
-    epochs = 200,
+    epochs = 10,
     device = device
   )
 

@@ -8,6 +8,7 @@ import os
 import glob
 import pickle
 import torch
+import traceback
 
 from datasets.dataset import prepare_datasets, load_datasets
 # from datasets.BUSI import BUSIDataset
@@ -15,8 +16,9 @@ from flower.clientWithModifications import generate_client_function
 from flower.serverWithModifications import get_on_fit_config_function, get_eval_function
 # from flower.client import generate_client_function
 # from flower.server import get_on_fit_config_function, get_eval_function
-from models.unetWithModifications \
-import SharedDown,QGenerator,SharedUpWithAttn
+# from models.unetWithModifications \
+# import SharedDown,QGenerator,SharedUpWithAttn
+
 
 @hydra.main(config_path="conf", config_name="without_FL", version_base=None)
 def mainWithAttention(cfg:DictConfig):
@@ -42,14 +44,20 @@ def mainWithAttention(cfg:DictConfig):
                                               cfg.num_classes, cfg.random_seed)
   
   #Define Strategy
-  strategy = fl.server.strategy.FedAvg(fraction_fit=0.0001, 
-                                        min_fit_clients=cfg.num_clients_per_round_fit, 
-                                        fraction_evaluate=0.0001, 
-                                        min_evaluate_clients=cfg.num_clients_per_round_eval, 
-                                        min_available_clients=cfg.num_clients, 
-                                        on_fit_config_fn=get_on_fit_config_function(cfg.config_fit),
-                                        evaluate_fn=get_eval_function(cfg.input_channels, cfg.num_classes, test_dataloaders, 
-                                                                      cfg.random_seed))
+  strategy = fl.server.strategy.FedAvg(
+    fraction_fit=0.0001, 
+    min_fit_clients=cfg.num_clients_per_round_fit, 
+    fraction_evaluate=0.0001, 
+    min_evaluate_clients=cfg.num_clients_per_round_eval, 
+    min_available_clients=cfg.num_clients, 
+    on_fit_config_fn=get_on_fit_config_function(cfg.config_fit),
+    evaluate_fn=get_eval_function(
+      cfg.input_channels, 
+      cfg.num_classes, 
+      test_dataloaders, 
+      cfg.random_seed
+    )
+  )
   
   # Start Simulation
   try:
@@ -65,11 +73,17 @@ def mainWithAttention(cfg:DictConfig):
     )
   except Exception as e:
     print(f"While simulating an error has occured : {e}")
-  finally:
-    q_weight_paths = glob.glob('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/*.pth')
-    for weight_path in q_weight_paths:
-      os.remove(weight_path)
+    traceback.print_exc()
+    queryWeightsPaths = glob.glob('queryWeights/*.pth')
+    for path in queryWeightsPaths:
+       os.remove(path)
     exit()
+  finally:
+    #  pass
+    queryWeightsPaths = glob.glob('queryWeights/*.pth')
+    for weight_path in queryWeightsPaths:
+      os.remove(weight_path)
+    # exit()
   
   # Save simulation results
   output_dir = HydraConfig.get().runtime.output_dir
@@ -130,12 +144,14 @@ def main(cfg: DictConfig):
           }
       )
     except Exception as e:
-      print(f"While simulating an error has occured : {e}")
+      print(f"Inside mainWithModifications While simulating an error has occured : {e}")
+      traceback.print_exc()
+      exit()
     finally:
       adapter_weight_paths = glob.glob('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/adapter_weight/*.pth')
       for weight_path in adapter_weight_paths:
         os.remove(weight_path)
-      exit()
+      # exit()
     
     # Save simulation results
     output_dir = HydraConfig.get().runtime.output_dir

@@ -34,15 +34,15 @@ class SelfAttention(nn.Module):
         return attn_out
 
 class DoubleConv(nn.Module):
-    """(Conv2d -> BN -> ReLU) * 2"""
+    """(Conv2d -> IN -> ReLU) * 2"""
     def __init__(self, in_channels, out_channels):
         super(DoubleConv, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.InstanceNorm2d(out_channels, affine=True), #Using Instance and Group Norm since in fed we dont have running statistics
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.InstanceNorm2d(out_channels, affine=True),
             nn.ReLU(inplace=True)
         )
 
