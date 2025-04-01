@@ -36,8 +36,8 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
           num_classes = num_classes
       )
 
-      self.queryWeightsPath = f'queryWeights/query{self.client_id}.pth'
-      self.modelWeightsPath = f'outputs_without_FL/fedDp/unetWithLQ.pth'
+      self.queryWeightsPath = f'/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/query{self.client_id}.pth'
+      self.modelWeightsPath = f'/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/fedDp/unetWithLQ.pth'
   
   def setQueryParameters(self):
       

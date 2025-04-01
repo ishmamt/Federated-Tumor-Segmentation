@@ -1,1 +1,1 @@
-python mainWithModifications.py hydra.run.dir=outputs_without_FL/fedDp
+python /content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/mainWithModifications.py hydra.run.dir=/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/fedDp

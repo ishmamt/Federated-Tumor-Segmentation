@@ -1,0 +1,12 @@
+loss of client 0 is 0.17040603856245676
+iou of client 0 is 0.8525766692477226
+dice of client 0 is 0.9201933033618451
+
+loss of client 1 is 0.3950204898913701
+iou of client 1 is 0.5467853415323193
+dice of client 1 is 0.6975513924244644
+
+loss of client 2 is 0.23883469899495444
+iou of client 2 is 0.7547342485884431
+dice of client 2 is 0.8528992778240451
+

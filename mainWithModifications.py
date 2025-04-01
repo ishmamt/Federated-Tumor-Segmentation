@@ -25,7 +25,7 @@ def performingIGC(serverWeightsPath, cfg, train_dataloaders, test_dataloaders):
   clients = []
 
   for idx in range(cfg.num_clients):
-    queryWeightsPath = f'queryWeights/query{idx}.pth'
+    queryWeightsPath = f'/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/query{idx}.pth'
     model = UNetWithAttention(
       in_channels = cfg.input_channels,
       num_classes = cfg.num_classes
@@ -68,11 +68,11 @@ def performingIGC(serverWeightsPath, cfg, train_dataloaders, test_dataloaders):
     ious.append(iou)
     dices.append(dice)
 
-  for idx in range(cfg.num_clients):
-    with open('outputs_without_FL/fedDp/resultLQ&IGC.txt','w') as f:
+  with open('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/fedDp/resultLQ&IGC.txt','w') as f:
+    for idx in range(cfg.num_clients):
       f.write(f'loss of client {idx} is {losses[idx]}\n')
-      f.write(f'iou of client {idx} is {losses[idx]}\n')
-      f.write(f'dice of client {idx} is {losses[idx]}\n')
+      f.write(f'iou of client {idx} is {ious[idx]}\n')
+      f.write(f'dice of client {idx} is {dices[idx]}\n')
       f.write('\n')
 
 
@@ -131,10 +131,10 @@ def mainWithAttention(cfg:DictConfig):
   except Exception as e:
     print(f"While simulating an error has occured : {e}")
     traceback.print_exc()
-    queryWeightsPaths = glob.glob('queryWeights/*.pth')
+    queryWeightsPaths = glob.glob('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/*.pth')
     for path in queryWeightsPaths:
       os.remove(path)
-    os.remove('outputs_without_FL/fedDp/unetWithLQ.pth')
+    os.remove('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/fedDp/unetWithLQ.pth')
     exit()
   finally:
     pass
@@ -156,7 +156,7 @@ def mainWithAttention(cfg:DictConfig):
 
   try:
     performingIGC(
-      serverWeightsPath = 'outputs_without_FL/fedDp/unetWithLQ.pth',
+      serverWeightsPath = '/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/fedDp/unetWithLQ.pth',
       cfg = cfg,
       train_dataloaders = train_dataloaders,
       test_dataloaders = test_dataloaders
@@ -164,16 +164,16 @@ def mainWithAttention(cfg:DictConfig):
   except Exception as e:
     print(f"While simulating an error has occured : {e}")
     traceback.print_exc()
-    queryWeightsPaths = glob.glob('queryWeights/*.pth')
+    queryWeightsPaths = glob.glob('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/*.pth')
     for path in queryWeightsPaths:
       os.remove(path)
-    os.remove('outputs_without_FL/fedDp/unetWithLQ.pth')
+    os.remove('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/fedDp/unetWithLQ.pth')
     exit()
 
-  queryWeightsPaths = glob.glob('queryWeights/*.pth')
+  queryWeightsPaths = glob.glob('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/*.pth')
   for path in queryWeightsPaths:
       os.remove(path)
-  os.remove('outputs_without_FL/fedDp/unetWithLQ.pth')
+  os.remove('/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/fedDp/unetWithLQ.pth')
 
 
 

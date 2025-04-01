@@ -1,7 +1,7 @@
 ---
 
 # General configurations
-num_rounds: 5
+num_rounds: 100
 num_clients: 3
 batch_size: 16
 input_channels: 1
@@ -16,9 +16,9 @@ train_ratio: 0.9
 val_ratio: 0.1
 output_dir: "/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/outputs_without_FL/"
 dataset_dirs: 
-  colon: "CVC-ColonDB"
-  colon1: "CVC-ColonDB"
-  colon2: "CVC-ColonDB"
+  colon: "/content/drive/MyDrive/UFF/CVC-ColonDB"
+  colon1: "/content/drive/MyDrive/UFF/CVC-ColonDB"
+  colon2: "/content/drive/MyDrive/UFF/CVC-ColonDB"
 
 # Client training configurations
 # Updated for Unet with attention module
@@ -28,4 +28,4 @@ config_fit:
   weight_decay: 1e-5
   local_epochs: 1
 #config for IGC
-igc_epochs: 3
+igc_epochs: 10

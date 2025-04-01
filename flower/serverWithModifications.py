@@ -71,7 +71,7 @@ def get_eval_function(input_channels, num_classes, test_dataloaders, random_seed
 
       for idx,test_dataloader in enumerate(test_dataloaders):
           
-          queryWeightsPath = f'queryWeights/query{idx}.pth'
+          queryWeightsPath = f'/content/drive/MyDrive/UFF/Federated-Tumor-Segmentation/q_weight/query{idx}.pth'
           if os.path.exists(queryWeightsPath):
             try:
               model.attn.query.load_state_dict(torch.load(queryWeightsPath))
