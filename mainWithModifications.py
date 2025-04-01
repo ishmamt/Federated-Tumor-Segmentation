@@ -9,15 +9,72 @@ import glob
 import pickle
 import torch
 import traceback
+from copy import deepcopy
+from torch.optim import AdamW,lr_scheduler
 
 from datasets.dataset import prepare_datasets, load_datasets
-# from datasets.BUSI import BUSIDataset
 from flower.clientWithModifications import generate_client_function
 from flower.serverWithModifications import get_on_fit_config_function, get_eval_function
-# from flower.client import generate_client_function
-# from flower.server import get_on_fit_config_function, get_eval_function
-# from models.unetWithModifications \
-# import SharedDown,QGenerator,SharedUpWithAttn
+from models.unetGpt import UNetWithAttention
+from trainWithModifications import train,test
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+def performingIGC(serverWeightsPath, cfg, train_dataloaders, test_dataloaders):
+
+  clients = []
+
+  for idx in range(cfg.num_clients):
+    queryWeightsPath = f'queryWeights/query{idx}.pth'
+    model = UNetWithAttention(
+      in_channels = cfg.input_channels,
+      num_classes = cfg.num_classes
+    )
+    model.load_state_dict(torch.load(serverWeightsPath)) ## Loading Server's Weight
+    model.attn.query.load_state_dict(torch.load(queryWeightsPath)) ## Loading Query's Weights
+
+    clients.append(model.to(device))
+
+  clientsForIgc = deepcopy(clients)
+
+  losses,ious,dices = [],[],[]
+
+  for idx in range(cfg.num_clients):
+    optimizer = AdamW(clients[idx].parameters(), lr=cfg.config_fit['lr'], weight_decay=cfg.config_fit['weight_decay'])
+    scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+      optimizer, 
+      T_0=10, 
+      T_mult=2, 
+      eta_min=cfg.config_fit['min_lr']
+    )
+
+    history = train(
+      model = clients[idx],
+      train_dataloader=train_dataloaders[idx],
+      optimizer = optimizer,
+      scheduler = scheduler,
+      epochs = cfg.igc_epochs,
+      device = device,
+      method = 'igc',
+      clients = clientsForIgc
+    )
+
+    loss,iou,dice = test(
+      model = clients[idx],
+      test_dataloader = test_dataloaders[idx],
+      device = device
+    )
+    losses.append(loss)
+    ious.append(iou)
+    dices.append(dice)
+
+  for idx in range(cfg.num_clients):
+    with open('outputs_without_FL/fedDp/resultLQ&IGC.txt','w') as f:
+      f.write(f'loss of client {idx} is {losses[idx]}\n')
+      f.write(f'iou of client {idx} is {losses[idx]}\n')
+      f.write(f'dice of client {idx} is {losses[idx]}\n')
+      f.write('\n')
+
 
 
 @hydra.main(config_path="conf", config_name="without_FL", version_base=None)
@@ -76,13 +133,14 @@ def mainWithAttention(cfg:DictConfig):
     traceback.print_exc()
     queryWeightsPaths = glob.glob('queryWeights/*.pth')
     for path in queryWeightsPaths:
-       os.remove(path)
+      os.remove(path)
+    os.remove('outputs_without_FL/fedDp/unetWithLQ.pth')
     exit()
   finally:
-    #  pass
-    queryWeightsPaths = glob.glob('queryWeights/*.pth')
-    for weight_path in queryWeightsPaths:
-      os.remove(weight_path)
+    pass
+    # queryWeightsPaths = glob.glob('queryWeights/*.pth')
+    # for weight_path in queryWeightsPaths:
+    #   os.remove(weight_path)
     # exit()
   
   # Save simulation results
@@ -95,6 +153,27 @@ def mainWithAttention(cfg:DictConfig):
   
   with open(results_output_dir, 'wb') as f:
       pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+  try:
+    performingIGC(
+      serverWeightsPath = 'outputs_without_FL/fedDp/unetWithLQ.pth',
+      cfg = cfg,
+      train_dataloaders = train_dataloaders,
+      test_dataloaders = test_dataloaders
+    )
+  except Exception as e:
+    print(f"While simulating an error has occured : {e}")
+    traceback.print_exc()
+    queryWeightsPaths = glob.glob('queryWeights/*.pth')
+    for path in queryWeightsPaths:
+      os.remove(path)
+    os.remove('outputs_without_FL/fedDp/unetWithLQ.pth')
+    exit()
+
+  queryWeightsPaths = glob.glob('queryWeights/*.pth')
+  for path in queryWeightsPaths:
+      os.remove(path)
+  os.remove('outputs_without_FL/fedDp/unetWithLQ.pth')
 
 
 

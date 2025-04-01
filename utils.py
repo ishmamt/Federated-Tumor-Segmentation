@@ -1,9 +1,39 @@
+import torch
 import os
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 
+#The following function is required for IGC in FedDP
+@torch.no_grad()
+def compute_pred_uncertainty(net_clients, images):
+    preds = []
+    for net in net_clients:
+        pred = net(images)
+        b, c, h, w = pred.size()
+        preds.append(pred.unsqueeze(0))
+    preds = torch.cat(preds, dim=0)
+
+    umap = torch.std(preds, dim=0)
+    # print(umap.max())
+    if umap.max() > 0:
+        umap = umap / umap.max()
+    # umap = umap.view(b, c, h * w)
+    # umap = torch.softmax(umap, dim=-1)
+    umap = umap.view(b, c, h, w)
+    return umap, preds
+
+#The following function is reqired for IGC in FedDP
+def weighted_bce_loss(score, target, weight):
+    target = target.float()
+    smooth = 1e-5
+    score = torch.clamp(score, smooth, 1 - smooth)
+
+    loss = -(target * torch.log(score) +
+             (1 - target) * torch.log(1 - score)) * weight
+    loss = torch.mean(loss)
+    return loss
 
 def show_image(img, msk, labels=['mask'], semantic=False, threshold=False):
     """

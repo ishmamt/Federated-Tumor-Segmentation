@@ -2,8 +2,7 @@ import os
 import flwr as fl
 import torch
 from collections import OrderedDict
-from torch.optim import Adam,AdamW
-from torch.optim import lr_scheduler
+from torch.optim import Adam,AdamW,lr_scheduler
 
 from models.unetWithModifications import SharedUnet,PersonalizedUnet
 from models.unetGpt import UNetWithAttention
@@ -38,6 +37,7 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
       )
 
       self.queryWeightsPath = f'queryWeights/query{self.client_id}.pth'
+      self.modelWeightsPath = f'outputs_without_FL/fedDp/unetWithLQ.pth'
   
   def setQueryParameters(self):
       
@@ -63,6 +63,13 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
       state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
       self.model.load_state_dict(state_dict, strict=True)
   
+  def saveServerModel(self):
+      print('saving server weights')
+      try:
+        torch.save(self.model.state_dict(),self.modelWeightsPath)
+      except Exception as e:
+        print('Exception while saving server weights')
+
   def getQueryParameters(self):
       print('saving query weights')
       try:
@@ -118,6 +125,7 @@ class FlowerClientWithAttention(fl.client.NumPyClient):
         )
       
       self.getQueryParameters()
+      self.saveServerModel()
 
       # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
       return self.get_parameters({}), len(self.train_dataloader), {"history": history}

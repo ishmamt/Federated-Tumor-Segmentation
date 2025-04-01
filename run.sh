@@ -1,0 +1,1 @@
+python mainWithModifications.py hydra.run.dir=outputs_without_FL/fedDp
