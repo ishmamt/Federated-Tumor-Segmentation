@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+# from utils import show_image_mask_tensor_pair
 
 class BUSIDataset(Dataset):
     def __init__(self, root_dir, image_size=512):
@@ -110,3 +111,16 @@ class BUSIDataset(Dataset):
         mask = self.load_mask(mask_path)
         
         return torch.Tensor(image), torch.Tensor(mask)
+    
+if __name__ == '__main__':
+    dataset = BUSIDataset(
+        root_dir='datasets/BUSI'
+    )
+
+    print(dataset.__len__())
+
+    image, mask = dataset.__getitem__(0)
+
+    # show_image_mask_tensor_pair(image,mask)
+
+    # print(type(image), type(mask))

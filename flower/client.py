@@ -1,15 +1,355 @@
+import os
+import shutil
+import glob
+import traceback
 import flwr as fl
 import torch
 from collections import OrderedDict
-from torch.optim import Adam
-from torch.optim import lr_scheduler
+from torch.optim import Adam,AdamW,lr_scheduler
 
 from models.UNet import UNet
+from models.fedDP import UNetWithAttention
+from models.fedOAP import UNetWithCrossAttention
 from train import train, test
 
+class FlowerClientFedOAP(fl.client.NumPyClient):
+  def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
+      """
+      Creates a FlowerClient with self attention module to simulate a client.
+      
+      Arguments:
+      train_dataloader (DataLoader): DataLoader for training data on a single client.
+      val_dataloader (DataLoader): DataLoader for validation data on a single client.
+      input_channels (int): Number of input channels in the model.
+      num_classes (int): Number of classes in the dataset.
+      random_seed (int): Random seed for reproducibility.
+      """
+      
+      super().__init__()
+      self.client_id = client_id
+      self.train_dataloader = train_dataloader
+      self.val_dataloader = val_dataloader
+      self.num_classes = num_classes
+      self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      
+      self.model = UNetWithCrossAttention(
+          in_channels = input_channels,
+          num_classes = num_classes
+      )
 
-class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, train_dataloader, val_dataloader, input_channels, num_classes, random_seed=42):
+      self.output_dir = output_dir
+      self.temporaryWeightsPath = 'temporaryWeights'
+      self.bottleneckQWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedOAPbottleneckQ{client_id}.pth')
+      self.queryWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedOAPquery{client_id}.pth')
+      self.adapterWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedOAPadapter{client_id}.pth')
+      self.outWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedOAPout{client_id}.pth')
+      self.modelWeightsPath = os.path.join(self.temporaryWeightsPath,'fedOAPserver.pth')
+      self.best_dice = -1.0
+  
+  def setPersonalizedParameters(self):
+      
+      if os.path.exists(self.queryWeightsPath) and os.path.exists(self.bottleneckQWeightsPath):
+          print('Loading personalized parameters')
+          try:
+            self.model.bottleneckQ.load_state_dict(torch.load(self.bottleneckQWeightsPath))
+            self.model.cross_attn.query.load_state_dict(torch.load(self.queryWeightsPath))
+            self.model.adapter.load_state_dict(torch.load(self.adapterWeightsPath))
+            self.model.outc.load_state_dict(torch.load(self.outWeightsPath))
+          except Exception as e:
+            print('Problem while loading personalized parameters')
+            traceback.print_exc()
+            exit()
+      else:
+          print('bottleneckQ and Query parameters are not saved')
+
+  def set_parameters(self, params):
+      """
+      Updates the model parameters using the given numpy arrays.
+      
+      Arguments:
+      params (list): List of numpy arrays representing the model parameters.
+      """
+      
+      params_dict = zip(self.model.state_dict().keys(), params)
+      state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+      self.model.load_state_dict(state_dict, strict=True)
+  
+  def saveServerModel(self):
+      print('saving server (fedOAP) weights')
+      try:
+        torch.save(self.model.state_dict(),self.modelWeightsPath)
+      except Exception as e:
+        print('Exception while saving server weights')
+        traceback.print_exc()
+        exit()
+
+  def getPersonalizedParameters(self):
+      print('saving personalized weights')
+      try:
+        torch.save(self.model.bottleneckQ.state_dict(), self.bottleneckQWeightsPath)
+        torch.save(self.model.cross_attn.query.state_dict(), self.queryWeightsPath)
+        torch.save(self.model.adapter.state_dict(), self.adapterWeightsPath)
+        torch.save(self.model.outc.state_dict(), self.outWeightsPath)
+      except Exception as e:
+        print('Exception while saving personalized weights')
+        traceback.print_exc()
+        exit()
+
+  def get_parameters(self, config):
+      """
+      Returns the current model parameters as numpy arrays.
+      
+      Arguments:
+      cfg (dict): Configuration dictionary.
+      
+      Returns:
+      params (list): List of numpy arrays representing the model parameters.
+      """
+      return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
+  
+  def copy_best_weights(self):
+    temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    for path in temporaryWeightsPaths:
+      file_name = path.split('/')[-1]
+      shutil.copy2(path, os.path.join(self.output_dir,file_name))
+
+  def fit(self, params, cfg):
+      """
+      Trains model on a client using the client's data.
+      
+      Arguments:
+      params (list): List of numpy arrays representing the model parameters.
+      cfg (dict): Configuration dictionary.
+      
+      Returns:
+      params (list): List of numpy arrays representing the updated model parameters.
+      length (int): Length of the training dataloader.
+      Dict (dict): Additional information (Training history) to be sent to the server.
+      """
+      
+      self.set_parameters(params)  # Update model parameters from the server
+      self.setPersonalizedParameters()
+
+      optimizer = AdamW(self.model.parameters(), lr=cfg['lr'], weight_decay=cfg['weight_decay'])
+      scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, 
+        T_0=10, 
+        T_mult=2, 
+        eta_min=cfg['min_lr']
+      )
+      
+      # Local training
+      history = train(
+          model = self.model,
+          train_dataloader = self.train_dataloader, 
+          optimizer = optimizer, 
+          scheduler = scheduler, 
+          epochs = cfg["local_epochs"], 
+          device = self.device
+        )
+      
+      self.getPersonalizedParameters()
+      self.saveServerModel()
+
+      # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
+      return self.get_parameters({}), len(self.train_dataloader), {"history": history}
+  
+  def evaluate(self, params, cfg):
+      """
+      Evaluates the model on the parameters sent by the server.
+      
+      Arguments:
+      params (list): List of numpy arrays representing the model parameters.
+      cfg (dict): Configuration dictionary.
+      
+      Returns:
+      loss (float): Average loss over the validation set.
+      length (int): Length of the validation dataloader.
+      eval_metrics (dict): Additional evaluation metrics (IoU, Dice) to be sent to the server.
+      """
+      
+      self.set_parameters(params)  # Update model parameters from the server
+      self.setPersonalizedParameters()
+      
+      loss, iou, dice = test(
+        self.model, 
+        self.val_dataloader, 
+        self.device
+      )
+
+      if dice > self.best_dice:
+        self.best_dice = dice
+        self.copy_best_weights()
+      
+      return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
+
+
+
+class FlowerClientFedDP(fl.client.NumPyClient):
+  def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
+      """
+      Creates a FlowerClient with self attention module to simulate a client.
+      
+      Arguments:
+      train_dataloader (DataLoader): DataLoader for training data on a single client.
+      val_dataloader (DataLoader): DataLoader for validation data on a single client.
+      input_channels (int): Number of input channels in the model.
+      num_classes (int): Number of classes in the dataset.
+      random_seed (int): Random seed for reproducibility.
+      """
+      
+      super().__init__()
+      self.client_id = client_id
+      self.train_dataloader = train_dataloader
+      self.val_dataloader = val_dataloader
+      self.num_classes = num_classes
+      self.output_dir = output_dir
+      self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      
+      self.model = UNetWithAttention(
+          in_channels = input_channels,
+          num_classes = num_classes
+      )
+
+      self.temporaryWeightsPath = 'temporaryWeights'
+      self.queryWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedDPquery{self.client_id}.pth')
+      self.modelWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedDPserver.pth')
+      self.best_dice = -1.0
+
+  def setQueryParameters(self):
+      
+      if os.path.exists(self.queryWeightsPath):
+          print('Loading query parameters')
+          try:
+            self.model.attn.query.load_state_dict(torch.load(self.queryWeightsPath))
+          except Exception as e:
+            print('Problem while loading query parameters')
+            traceback.print_exc()
+            exit()
+      else:
+          print('Query parameter not saved')
+
+  def set_parameters(self, params):
+      """
+      Updates the model parameters using the given numpy arrays.
+      
+      Arguments:
+      params (list): List of numpy arrays representing the model parameters.
+      """
+      
+      params_dict = zip(self.model.state_dict().keys(), params)
+      state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+      self.model.load_state_dict(state_dict, strict=True)
+  
+  def saveServerModel(self):
+      print('saving fedDP server weights')
+      try:
+        torch.save(self.model.state_dict(),self.modelWeightsPath)
+      except Exception as e:
+        print('Exception while saving server weights')
+        traceback.print_exc()
+        exit()
+
+  def getQueryParameters(self):
+      print('saving query weights')
+      try:
+        torch.save(self.model.attn.query.state_dict(), self.queryWeightsPath)
+      except Exception as e:
+        print('Exception while saving query weights')
+        traceback.print_exc()
+        exit()
+
+  def get_parameters(self, config):
+      """
+      Returns the current model parameters as numpy arrays.
+      
+      Arguments:
+      cfg (dict): Configuration dictionary.
+      
+      Returns:
+      params (list): List of numpy arrays representing the model parameters.
+      """
+      return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
+  
+  def copy_best_weights(self):
+    temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    for path in temporaryWeightsPaths:
+      file_name = path.split('/')[-1]
+      shutil.copy2(path, os.path.join(self.output_dir,file_name))
+
+  def fit(self, params, cfg):
+      """
+      Trains model on a client using the client's data.
+      
+      Arguments:
+      params (list): List of numpy arrays representing the model parameters.
+      cfg (dict): Configuration dictionary.
+      
+      Returns:
+      params (list): List of numpy arrays representing the updated model parameters.
+      length (int): Length of the training dataloader.
+      Dict (dict): Additional information (Training history) to be sent to the server.
+      """
+      
+      self.set_parameters(params)  # Update model parameters from the server
+      self.setQueryParameters()
+
+      optimizer = AdamW(self.model.parameters(), lr=cfg['lr'], weight_decay=cfg['weight_decay'])
+      scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, 
+        T_0=10, 
+        T_mult=2, 
+        eta_min=cfg['min_lr']
+      )
+      
+      # Local training
+      history = train(
+          model = self.model,
+          train_dataloader = self.train_dataloader, 
+          optimizer = optimizer, 
+          scheduler = scheduler, 
+          epochs = cfg["local_epochs"], 
+          device = self.device
+        )
+      
+      self.getQueryParameters()
+      self.saveServerModel()
+
+      # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
+      return self.get_parameters({}), len(self.train_dataloader), {"history": history}
+  
+  def evaluate(self, params, cfg):
+      """
+      Evaluates the model on the parameters sent by the server.
+      
+      Arguments:
+      params (list): List of numpy arrays representing the model parameters.
+      cfg (dict): Configuration dictionary.
+      
+      Returns:
+      loss (float): Average loss over the validation set.
+      length (int): Length of the validation dataloader.
+      eval_metrics (dict): Additional evaluation metrics (IoU, Dice) to be sent to the server.
+      """
+      
+      self.set_parameters(params)  # Update model parameters from the server
+      self.setQueryParameters()
+      
+      loss, iou, dice = test(
+          self.model, 
+          self.val_dataloader, 
+          self.device
+        )
+      
+      if dice > self.best_dice:
+        self.best_dice = dice
+        self.copy_best_weights()
+
+      return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
+
+
+class FlowerClientFedAVG(fl.client.NumPyClient):
+    def __init__(self, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
         """
         Creates a FlowerClient object to simulate a client.
         
@@ -26,9 +366,10 @@ class FlowerClient(fl.client.NumPyClient):
         self.val_dataloader = val_dataloader
         self.num_classes = num_classes
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+        self.output_dir = output_dir
         self.model = UNet(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
-        
+        self.best_dice = -1.0
+
     def set_parameters(self, params):
         """
         Updates the model parameters using the given numpy arrays.
@@ -97,10 +438,14 @@ class FlowerClient(fl.client.NumPyClient):
         
         loss, iou, dice = test(self.model, self.val_dataloader, self.device)
         
+        if dice > self.best_dice:
+          dice = self.best_dice
+          torch.save(self.model,os.path.join(self.output_dir,'fedAVG.pth'))
+
         return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
     
     
-def generate_client_function(train_dataloaders, val_dataloaders, input_channels, num_classes, random_seed):
+def generate_client_function(strategy, train_dataloaders, val_dataloaders, input_channels, num_classes, output_dir, random_seed):
     """
     Provides a client function that the server can evoke to spawn clients.
     
@@ -125,8 +470,36 @@ def generate_client_function(train_dataloaders, val_dataloaders, input_channels,
         Returns:
         client (FlowerClient): FlowerClient object for the specified client.
         """
-        
-        return FlowerClient(train_dataloaders[int(client_id)], val_dataloaders[int(client_id)], 
-                            input_channels, num_classes, random_seed)
+        if strategy == 'fedOAP':
+          return FlowerClientFedOAP(
+            client_id=int(client_id), 
+            train_dataloader=train_dataloaders[int(client_id)], 
+            val_dataloader=val_dataloaders[int(client_id)], 
+            input_channels=input_channels, 
+            num_classes=num_classes, 
+            output_dir=output_dir,
+            random_seed=random_seed
+          )
+        elif strategy == 'fedDP':
+          return FlowerClientFedDP(
+            client_id=int(client_id), 
+            train_dataloader=train_dataloaders[int(client_id)], 
+            val_dataloader=val_dataloaders[int(client_id)], 
+            input_channels=input_channels, 
+            num_classes=num_classes, 
+            output_dir=output_dir,
+            random_seed=random_seed
+          )
+        elif strategy == 'fedAVG':
+          return FlowerClientFedAVG(
+            train_dataloader=train_dataloaders[int(client_id)], 
+            val_dataloader=val_dataloaders[int(client_id)], 
+            input_channels=input_channels, 
+            num_classes=num_classes, 
+            output_dir=output_dir, 
+            random_seed=random_seed
+          )
+        else :
+           print('the client function for given strategy is yet to be implemented')
     
     return client_function

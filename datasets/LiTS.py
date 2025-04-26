@@ -5,9 +5,10 @@ import torch
 from torch.utils.data import Dataset
 from multiprocessing import Pool
 
+# from utils import show_image_mask_tensor_pair
 
 class LiTSDataset(Dataset):
-    def __init__(self, root_dir, image_size=512, target_threshold=5.0):
+    def __init__(self, root_dir, image_size=512, target_threshold=0.2):
         """
         Creates the LiTS dataset.
 
@@ -37,8 +38,8 @@ class LiTSDataset(Dataset):
         image_mask_list (list): List of image mask pair file paths.
         """
         
-        images_dir = os.path.join(root_dir, "train_images", "train_images")
-        masks_dir = os.path.join(root_dir, "train_masks", "train_masks")
+        images_dir = os.path.join(root_dir, "train_images")
+        masks_dir = os.path.join(root_dir, "train_masks")
         
         image_mask_list = [{"image": os.path.join(images_dir, image_name), "mask": os.path.join(masks_dir, image_name)}
         for image_name in os.listdir(images_dir) if image_name.endswith(".jpg") and os.path.exists(os.path.join(masks_dir, image_name))]
@@ -126,7 +127,22 @@ class LiTSDataset(Dataset):
         mask (torch.Tensor): Mask tensor.
         """
         
+        # self.image_mask_list
+
         image = self.load_image(self.image_mask_list[idx]["image"])
         mask = self.load_mask(self.image_mask_list[idx]["mask"])
         
         return torch.Tensor(image), torch.Tensor(mask)
+    
+
+if __name__ == '__main__':
+    dataset = LiTSDataset(
+        root_dir='datasets/LITS',
+        target_threshold=0.2
+    )
+
+    print(dataset.__len__())
+
+    image, mask = dataset.__getitem__(100)
+    # show_image_mask_tensor_pair(image,mask)
+    # print(type(image),type(mask))

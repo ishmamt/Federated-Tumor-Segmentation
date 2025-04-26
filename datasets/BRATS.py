@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset
 from multiprocessing import Pool
 
+# from utils import show_image_mask_tensor_pair
 
 class BRATSDataset(Dataset):
     def __init__(self, root_dir, image_size=512, target_threshold=5.0):
@@ -127,3 +128,18 @@ class BRATSDataset(Dataset):
             mask = self.load_mask(file["mask"][()])
             
         return torch.Tensor(image), torch.Tensor(mask)
+    
+
+if __name__ == '__main__':
+    dataset = BRATSDataset(
+        root_dir='datasets/BRATS',
+        target_threshold=5
+    )
+
+    print(dataset.__len__())
+
+    image, mask = dataset.__getitem__(0)
+
+    # show_image_mask_tensor_pair(image,mask)
+
+    # print(type(image),type(mask))

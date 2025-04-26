@@ -1,0 +1,31 @@
+---
+
+# General configurations
+num_rounds: 1
+num_clients: 3
+batch_size: 16
+input_channels: 1
+num_classes: 1
+num_clients_per_round_fit: 3
+num_clients_per_round_eval: 3
+image_size: 128
+random_seed: 42
+
+# Dataset configurations
+train_ratio: 0.9
+val_ratio: 0.1
+output_dir: "outputs/fedDP"
+dataset_dirs: 
+  busi: 'datasets/data/BUSI'
+  brats: 'datasets/data/BRATS'
+  lits: 'datasets/data/LITS'
+
+# Client training configurations
+# Updated for Unet with attention module
+config_fit:
+  lr: 0.0001
+  min_lr: 0.000001
+  weight_decay: 0.00001
+  local_epochs: 1
+#config for IGC
+igc_epochs: 10

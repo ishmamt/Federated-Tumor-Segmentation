@@ -15,3 +15,9 @@
 
 # Data Folder and its contents
 data/
+
+# zipped dataset
+*.zip
+
+# some sort of cache
+*.pyc

@@ -6,20 +6,6 @@ from monai.networks.blocks.dynunet_block import UnetResBlock
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-class SpatialAdapter(torch.nn.Module):
-    def __init__(self, adapter_kernel_size=3, feature_size=48, spatial_dims=3, norm_name="instance"):
-        super().__init__()
-        self.feature_size = feature_size
-        self.adapter = UnetResBlock(spatial_dims, feature_size, feature_size, kernel_size=adapter_kernel_size,
-                                    stride=1, norm_name=norm_name)
-
-    def forward(self, x):
-        out = self.adapter(x)
-
-        return out
-
-
-
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         """
