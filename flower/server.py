@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from collections import OrderedDict
 
-from flower.clientWithModifications import FlowerClientFedOAP, FlowerClientFedDP, FlowerClientFedAVG
+from flower.client import FlowerClientFedOAP, FlowerClientFedDP, FlowerClientFedAVG
 
 def get_on_fit_config_function(cfg):
     """

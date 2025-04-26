@@ -16,8 +16,8 @@ import argparse
 from tqdm import tqdm
 
 from datasets.dataset import prepare_datasets, load_datasets
-from flower.clientWithModifications import generate_client_function
-from flower.serverWithModifications import get_on_fit_config_function, get_eval_function
+from flower.client import generate_client_function
+from flower.server import get_on_fit_config_function, get_eval_function
 from metrics import iou_dice_score
 from finetune import FinetuneFedOAP,FineTuneFedDP
 from models.UNet import UNet
