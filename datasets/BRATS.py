@@ -23,8 +23,20 @@ class BRATSDataset(Dataset):
         self.target_threshold = target_threshold
         
         # Use a Pool to parallelize the process of keeping images with more than 5% non-zero pixels in the mask
+        self.valid_paths = []
+        self.invalid_paths = []
+        all_file_paths = self.get_h5_files(root_dir)
+
+        for file_path in all_file_paths:
+            try:
+                with h5py.File(file_path, "r"):
+                    self.valid_paths.append(file_path)
+            except (OSError, IOError) as e:
+                print(f"[Warning] Skipping corrupted file: {file_path} ({e})")
+                self.invalid_paths.append(file_path)
+        
         with Pool() as pool:
-            self.file_paths = pool.map(self.process_file, self.get_h5_files(root_dir))
+            self.file_paths = pool.map(self.process_file, self.valid_paths)
             
         self.file_paths = [file for file in self.file_paths if file is not None]
     
@@ -132,7 +144,7 @@ class BRATSDataset(Dataset):
 
 if __name__ == '__main__':
     dataset = BRATSDataset(
-        root_dir='datasets/BRATS',
+        root_dir='datasets/data/BRATS',
         target_threshold=5
     )
 
