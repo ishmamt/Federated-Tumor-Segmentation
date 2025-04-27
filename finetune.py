@@ -216,7 +216,7 @@ class FinetuneFedOAP():
       criterion = BCEDiceLoss()
       test_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
       self.clients[idx].load_state_dict(
-        torch.load(self.output_dir,f'fedOAPfinetuned{idx}.pth')
+        torch.load(os.path.join(self.output_dir,f'fedOAPfinetuned{idx}.pth'))
       )
       self.clients[idx].eval()
       self.clients[idx].to(self.device)
@@ -277,6 +277,8 @@ class FineTuneFedDP():
     self.clients = self.init_models()
     self.optimizers, self.schedulers = self.init_opt_sch()
     self.clientsForIgc = deepcopy(self.clients)
+    for ix in range(self.num_clients):
+        self.clientsForIgc[ix].to(self.device)
 
   def init_models(self):
     clients = []
@@ -290,7 +292,7 @@ class FineTuneFedDP():
       serverPath = os.path.join(self.output_dir,'fedDPserver.pth')
       if os.path.exists(serverPath):
         log(INFO, f'loading server weights for client {idx}')
-        client.load_state_dict(torch.load(queryWeightsPath))
+        client.load_state_dict(torch.load(serverPath))
       else:
         log(INFO, f"server weights for client {idx} is not found")
 
@@ -301,6 +303,7 @@ class FineTuneFedDP():
       else:
         log(INFO, f"query weights for client {idx} is not found")
       
+      client.to(self.device)
       clients.append(client)
     
     return clients
@@ -328,10 +331,10 @@ class FineTuneFedDP():
     return optimizers, schedulers
 
   def train(self):
+    histories = []
     for idx in range(self.num_clients):
       criterion = BCEDiceLoss()
       self.clients[idx].train()
-      self.clients.to(device)
       
       train_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
       history = {"epoch": [], 
@@ -340,13 +343,13 @@ class FineTuneFedDP():
                   "train_iou": [],
                   "train_dice": []
                   }
-      
+      best_dice = -1.0
       for epoch in range(self.epochs):
           print(f"Epoch {epoch} / {self.epochs}:\n")
           loop = tqdm(self.train_dataloaders[idx])
-          
+
           for images, masks in loop:
-              images, masks = images.to(device), masks.to(device)
+              images, masks = images.to(self.device), masks.to(self.device)
               
               self.optimizers[idx].zero_grad()
               outputs = self.clients[idx](images)
@@ -388,7 +391,8 @@ class FineTuneFedDP():
           history["train_iou"].append(train_avg_meters["iou"].avg)
           history["train_dice"].append(train_avg_meters["dice"].avg)
           
-      return history
+      histories.append(history)
+    return histories
 
   def val(self,client,ix):
     test_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
@@ -412,7 +416,7 @@ class FineTuneFedDP():
       criterion = BCEDiceLoss()
       test_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
       self.clients[idx].load_state_dict(
-        torch.load(self.output_dir,f'fedDPfinetuned{idx}.pth')
+              torch.load(os.path.join(self.output_dir,f'fedDPfinetuned{idx}.pth'))
       )
       self.clients[idx].eval()
       self.clients[idx].to(self.device)

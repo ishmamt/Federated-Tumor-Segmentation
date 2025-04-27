@@ -28,5 +28,5 @@ config_fit:
   weight_decay: 0.00001
   local_epochs: 1
 #config for finetuning
-finetuning_epochs: 10
+finetuning_epochs: 3
 val_per_epoch: 2

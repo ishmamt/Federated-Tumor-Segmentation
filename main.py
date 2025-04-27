@@ -112,7 +112,7 @@ def mainFedOAP(args,cfg):
       config_fit=cfg['config_fit'],
       device=device,
       output_dir=cfg['output_dir'],
-      epochs=1,
+      epochs=cfg['finetuning_epochs'],
       val_per_epoch=cfg['val_per_epoch'],
       in_channels=cfg['input_channels'],
       num_classes=cfg['num_classes']
@@ -204,7 +204,7 @@ def mainFedDP(args,cfg):
       os.remove(path)
     exit()
   finally:
-    queryWeightsPaths = glob.glob('queryWeights/*.pth')
+    queryWeightsPaths = glob.glob('temporaryWeights/*.pth')
     for weight_path in queryWeightsPaths:
       os.remove(weight_path)
 
@@ -218,7 +218,7 @@ def mainFedDP(args,cfg):
       config_fit=cfg['config_fit'],
       device=device,
       output_dir=cfg['output_dir'],
-      epochs=1,
+      epochs=cfg['igc_epochs'],
       val_per_epoch=cfg['val_per_epoch'],
       in_channels=cfg['input_channels'],
       num_classes=cfg['num_classes']

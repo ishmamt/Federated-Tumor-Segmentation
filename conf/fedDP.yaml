@@ -1,7 +1,7 @@
 ---
 
 # General configurations
-num_rounds: 1
+num_rounds: 3
 num_clients: 3
 batch_size: 16
 input_channels: 1
@@ -28,5 +28,5 @@ config_fit:
   weight_decay: 0.00001
   local_epochs: 1
 #config for IGC
-igc_epochs: 10
+igc_epochs: 3
 val_per_epoch: 2
