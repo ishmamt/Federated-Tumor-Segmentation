@@ -1,7 +1,7 @@
 ---
 
 # General configurations
-num_rounds: 3
+num_rounds: 50
 num_clients: 3
 batch_size: 16
 input_channels: 1
