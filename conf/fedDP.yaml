@@ -29,3 +29,4 @@ config_fit:
   local_epochs: 1
 #config for IGC
 igc_epochs: 10
+val_per_epoch: 2
