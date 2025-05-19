@@ -15,6 +15,9 @@
 
 # Data Folder and its contents
 data/
+CVC-ColonDB
+__pycache__
+datasets
 
 # zipped dataset
 *.zip
