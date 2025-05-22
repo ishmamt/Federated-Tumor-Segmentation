@@ -76,7 +76,7 @@ class Up(nn.Module):
         return self.conv(x)
 
 class SpatialAdapter(nn.Module):
-    def __init__(self, in_channels, resType='none'):
+    def __init__(self, in_channels, resType='res3'):
         super(SpatialAdapter, self).__init__()
         self.resType = resType
         self.conv = nn.Sequential(
@@ -100,8 +100,8 @@ class SpatialAdapter(nn.Module):
         conv_out = self.conv(x)
         if self.resType != 'none':
             res = self.residual(x)
-            return self.act(out+res) 
-        return self.act(self.out(x))
+            return self.act(conv_out+res) 
+        return self.act(conv_out)
 
 class UNetWithCrossAttention(nn.Module):
     def __init__(self, in_channels=3, num_classes=1):

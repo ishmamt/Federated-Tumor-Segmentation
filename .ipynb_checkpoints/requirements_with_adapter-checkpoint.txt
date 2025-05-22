@@ -1,0 +1,9 @@
+flwr==1.4.0
+hydra-core
+ray
+tqdm
+opencv-python
+matplotlib
+pandas
+h5py
+monai

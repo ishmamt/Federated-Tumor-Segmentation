@@ -23,4 +23,4 @@ datasets
 *.zip
 
 # some sort of cache
-*.pyc
+*.pyc.ipynb_checkpoints/
