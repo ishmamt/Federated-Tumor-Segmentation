@@ -24,3 +24,4 @@ datasets
 
 # some sort of cache
 *.pyc.ipynb_checkpoints/
+.ipynb_checkpoints/
