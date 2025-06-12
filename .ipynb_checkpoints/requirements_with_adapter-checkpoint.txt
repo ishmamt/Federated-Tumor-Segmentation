@@ -6,4 +6,4 @@ opencv-python
 matplotlib
 pandas
 h5py
-monai
+gdown
