@@ -9,7 +9,7 @@ from multiprocessing import Pool
 # from utils import show_image_mask_tensor_pair
 
 class BRATSDataset(Dataset):
-    def __init__(self, root_dir, image_size=512, target_threshold=5.0):
+    def __init__(self, root_dir, image_size=512):
         """
         Creates the BRATS dataset.
 
@@ -20,7 +20,6 @@ class BRATSDataset(Dataset):
         """
         
         self.image_size = image_size
-        self.target_threshold = target_threshold
         
         # Use a Pool to parallelize the process of keeping images with more than 5% non-zero pixels in the mask
         self.valid_paths = []
@@ -35,10 +34,12 @@ class BRATSDataset(Dataset):
                 print(f"[Warning] Skipping corrupted file: {file_path} ({e})")
                 self.invalid_paths.append(file_path)
         
-        with Pool() as pool:
-            self.file_paths = pool.map(self.process_file, self.valid_paths)
+        # with Pool() as pool:
+        #     self.file_paths = pool.map(self.process_file, self.valid_paths)
             
-        self.file_paths = [file for file in self.file_paths if file is not None]
+        # self.file_paths = [file for file in self.file_paths if file is not None]
+
+        self.file_paths = self.valid_paths
     
     def get_h5_files(self, root_dir):
         """
@@ -52,25 +53,6 @@ class BRATSDataset(Dataset):
         """
         
         return [os.path.join(root_dir, f) for f in os.listdir(root_dir) if f.endswith(".h5")]
-    
-    def process_file(self, h5_file):
-        """
-        Only considers images with more than 5% non-zero pixels in the mask.
-        
-        Arguments:
-        h5_file (str): Path to the.h5 file.
-        
-        Returns:
-        h5_file (str) or None: Path to the.h5 file or None if the image does not meet the criteria.
-        """
-        
-        with h5py.File(h5_file, "r") as file:
-            mask = self.load_mask(file["mask"][()])
-            
-            if (((mask != 0).sum() / (self.image_size * self.image_size)) * 100) >= self.target_threshold:
-                return h5_file
-            else:
-                return None
     
     def load_image(self, image):
         """
@@ -144,8 +126,7 @@ class BRATSDataset(Dataset):
 
 if __name__ == '__main__':
     dataset = BRATSDataset(
-        root_dir='datasets/data/BRATS',
-        target_threshold=5
+        root_dir='resized_data/brats'
     )
 
     print(dataset.__len__())

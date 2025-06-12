@@ -8,7 +8,7 @@ from multiprocessing import Pool
 # from utils import show_image_mask_tensor_pair
 
 class LiTSDataset(Dataset):
-    def __init__(self, root_dir, image_size=512, target_threshold=0.2):
+    def __init__(self, root_dir, image_size=512):
         """
         Creates the LiTS dataset.
 
@@ -19,13 +19,14 @@ class LiTSDataset(Dataset):
         """
         
         self.image_size = image_size
-        self.target_threshold = target_threshold
+
+        self.image_mask_list = self.get_image_mask_pairs(root_dir)
         
         # Use a Pool to parallelize the process of keeping images with more than 5% non-zero pixels in the mask
-        with Pool() as pool:
-            self.image_mask_list = pool.map(self.process_file, self.get_image_mask_pairs(root_dir))
+        # with Pool() as pool:
+        #     self.image_mask_list = pool.map(self.process_file, self.get_image_mask_pairs(root_dir))
             
-        self.image_mask_list = [file for file in self.image_mask_list if file is not None]
+        # self.image_mask_list = [file for file in self.image_mask_list if file is not None]
     
     def get_image_mask_pairs(self, root_dir):
         """
@@ -45,25 +46,6 @@ class LiTSDataset(Dataset):
         for image_name in os.listdir(images_dir) if image_name.endswith(".jpg") and os.path.exists(os.path.join(masks_dir, image_name))]
         
         return image_mask_list
-    
-    def process_file(self, image_mask_pair):
-        """
-        Only considers images with more than 5% non-zero pixels in the mask.
-        
-        Arguments:
-        image_mask_pair (dict): image mask pair file paths.
-        
-        Returns:
-        image_mask_pair (dict) or None: Paths to the image mask pair or None if the image does not meet the criteria.
-        """
-        
-        mask = cv2.imread(image_mask_pair["mask"])
-        mask = np.where(mask == 2.0, 255.0, 0.0)  # The tumor is presented as 255 and the background as 0
-        
-        if (((mask != 0).sum() / (self.image_size * self.image_size)) * 100) >= self.target_threshold:
-            return image_mask_pair
-        else:
-            return None
     
     def load_image(self, image_path):
         """
@@ -137,8 +119,7 @@ class LiTSDataset(Dataset):
 
 if __name__ == '__main__':
     dataset = LiTSDataset(
-        root_dir='datasets/LITS',
-        target_threshold=0.2
+        root_dir='resized_data/lits'
     )
 
     print(dataset.__len__())
