@@ -23,4 +23,5 @@ resized_data
 *.zip
 
 # some sort of cache
-*.pyc
+*.pyc.ipynb_checkpoints/
+.ipynb_checkpoints/

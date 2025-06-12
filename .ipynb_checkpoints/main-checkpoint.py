@@ -39,9 +39,6 @@ def mainFedOAP(args,cfg):
   # Load Datasets
   datasets = load_datasets(cfg['dataset_dirs'], cfg['image_size'])
   log(INFO, f"Datasets loaded. Number of datasets: {len(datasets)}")
-  for ix in range(len(datasets)):
-    log(INFO, f"Number of samples in dataset {ix}: {datasets[ix].__len__()}")
-
   train_dataloaders, val_dataloaders, test_dataloaders = prepare_datasets(
     datasets=datasets, 
     batch_size=cfg['batch_size'], 
@@ -51,8 +48,6 @@ def mainFedOAP(args,cfg):
     val_ratio=cfg['val_ratio']
   )
   
-  log(INFO,'Data loaders are created')
-
   # Define Clients
   client_function = generate_client_function(
     strategy=args.strategy,

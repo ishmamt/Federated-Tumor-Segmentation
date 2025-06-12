@@ -1,0 +1,8 @@
+flwr==1.4.0
+hydra-core==1.3.2
+ray==1.11.1
+tqdm==4.66.4
+opencv-python==4.10.0.84
+matplotlib==3.7.5
+pandas==2.0.3
+h5py==3.11.0
