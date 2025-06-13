@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import glob
@@ -44,7 +45,6 @@ class FlowerClientFedOAP(fl.client.NumPyClient):
       self.adapterWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedOAPadapter{client_id}.pth')
       self.outWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedOAPout{client_id}.pth')
       self.modelWeightsPath = os.path.join(self.temporaryWeightsPath,'fedOAPserver.pth')
-      self.best_dice = -1.0
   
   def setPersonalizedParameters(self):
       
@@ -108,10 +108,12 @@ class FlowerClientFedOAP(fl.client.NumPyClient):
       return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
   
   def copy_best_weights(self):
-    temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    temporaryWeightsPaths = glob.glob(f'temporaryWeights/*{self.client_id}.pth')
     for path in temporaryWeightsPaths:
       file_name = path.split('/')[-1]
       shutil.copy2(path, os.path.join(self.output_dir,file_name))
+    if os.path.exists('temporaryWeights/fedOAPserver.pth'):
+      shutil.copy2('temporaryWeights/fedOAPserver.pth', os.path.join(self.output_dir,'fedOAPserver.pth'))
 
   def fit(self, params, cfg):
       """
@@ -177,10 +179,25 @@ class FlowerClientFedOAP(fl.client.NumPyClient):
         self.device
       )
 
-      if dice > self.best_dice:
-        self.best_dice = dice
+      best_dice_path = os.path.join(self.output_dir,'best_dice.json')
+      if os.path.exists(best_dice_path):
+        with open(best_dice_path, "r") as f:
+          best_dice_dict = json.load(f)
+      else:
+        best_dice_dict = {
+          '0':-1.0,
+          '1':-1.0,
+          '2':-1.0
+        }
+        with open(best_dice_path, "w") as f:
+            json.dump(best_dice_dict, f, indent=4)
+    
+      if dice > best_dice_dict[str(self.client_id)]:
+        best_dice_dict[str(self.client_id)] = dice
         self.copy_best_weights()
-      
+        with open(best_dice_path, "w") as f:
+            json.dump(best_dice_dict, f, indent=4)
+              
       return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
 
 
@@ -214,7 +231,6 @@ class FlowerClientFedDP(fl.client.NumPyClient):
       self.temporaryWeightsPath = 'temporaryWeights'
       self.queryWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedDPquery{self.client_id}.pth')
       self.modelWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedDPserver.pth')
-      self.best_dice = -1.0
 
   def setQueryParameters(self):
       
@@ -272,10 +288,12 @@ class FlowerClientFedDP(fl.client.NumPyClient):
       return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
   
   def copy_best_weights(self):
-    temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    temporaryWeightsPaths = glob.glob(f'temporaryWeights/*{self.client_id}.pth')
     for path in temporaryWeightsPaths:
       file_name = path.split('/')[-1]
       shutil.copy2(path, os.path.join(self.output_dir,file_name))
+    if os.path.exists('temporaryWeights/fedDPserver.pth'):
+      shutil.copy2('temporaryWeights/fedDPserver.pth', os.path.join(self.output_dir,'fedDPserver.pth'))
 
   def fit(self, params, cfg):
       """
@@ -340,16 +358,31 @@ class FlowerClientFedDP(fl.client.NumPyClient):
           self.val_dataloader, 
           self.device
         )
-      
-      if dice > self.best_dice:
-        self.best_dice = dice
+
+      best_dice_path = os.path.join(self.output_dir,'best_dice.json')
+      if os.path.exists(best_dice_path):
+        with open(best_dice_path, "r") as f:
+          best_dice_dict = json.load(f)
+      else:
+        best_dice_dict = {
+          '0':-1.0,
+          '1':-1.0,
+          '2':-1.0
+        }
+        with open(best_dice_path, "w") as f:
+            json.dump(best_dice_dict, f, indent=4)
+    
+      if dice > best_dice_dict[str(self.client_id)]:
+        best_dice_dict[str(self.client_id)] = dice
         self.copy_best_weights()
+        with open(best_dice_path, "w") as f:
+            json.dump(best_dice_dict, f, indent=4)
 
       return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
 
 
 class FlowerClientFedAVG(fl.client.NumPyClient):
-    def __init__(self, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
+    def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
         """
         Creates a FlowerClient object to simulate a client.
         
@@ -362,13 +395,13 @@ class FlowerClientFedAVG(fl.client.NumPyClient):
         """
         
         super().__init__()
+        self.client_id = client_id
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.num_classes = num_classes
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.output_dir = output_dir
         self.model = UNet(in_channels=input_channels, num_classes=num_classes, random_seed=random_seed)
-        self.best_dice = -1.0
 
     def set_parameters(self, params):
         """
@@ -437,10 +470,25 @@ class FlowerClientFedAVG(fl.client.NumPyClient):
         self.set_parameters(params)  # Update model parameters from the server
         
         loss, iou, dice = test(self.model, self.val_dataloader, self.device)
-        
-        if dice > self.best_dice:
-          dice = self.best_dice
+
+        best_dice_path = os.path.join(self.output_dir,'best_dice.json')
+        if os.path.exists(best_dice_path):
+          with open(best_dice_path, "r") as f:
+            best_dice_dict = json.load(f)
+        else:
+          best_dice_dict = {
+            '0':-1.0,
+            '1':-1.0,
+            '2':-1.0
+          }
+          with open(best_dice_path, "w") as f:
+              json.dump(best_dice_dict, f, indent=4)
+      
+        if dice > best_dice_dict[str(self.client_id)]:
+          best_dice_dict[str(self.client_id)] = dice
           torch.save(self.model,os.path.join(self.output_dir,'fedAVG.pth'))
+          with open(best_dice_path, "w") as f:
+              json.dump(best_dice_dict, f, indent=4)
 
         return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
     
@@ -492,6 +540,7 @@ def generate_client_function(strategy, train_dataloaders, val_dataloaders, input
           )
         elif strategy == 'fedAVG':
           return FlowerClientFedAVG(
+            client_id=int(client_id),
             train_dataloader=train_dataloaders[int(client_id)], 
             val_dataloader=val_dataloaders[int(client_id)], 
             input_channels=input_channels, 

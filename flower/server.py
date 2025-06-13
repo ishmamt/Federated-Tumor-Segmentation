@@ -107,6 +107,7 @@ def get_eval_function(strategy, input_channels, num_classes, val_dataloaders, ou
       for idx,val_dataloader in enumerate(val_dataloaders):
 
         modelServerEval = FlowerClientFedAVG(
+          client_id = idx,  
           train_dataloader=None, 
           val_dataloader=val_dataloader, 
           input_channels=input_channels, 

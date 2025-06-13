@@ -39,6 +39,9 @@ def mainFedOAP(args,cfg):
   # Load Datasets
   datasets = load_datasets(cfg['dataset_dirs'], cfg['image_size'])
   log(INFO, f"Datasets loaded. Number of datasets: {len(datasets)}")
+  for ix in range(len(datasets)):
+    log(INFO, f"Number of samples in dataset {ix}: {datasets[ix].__len__()}")
+
   train_dataloaders, val_dataloaders, test_dataloaders = prepare_datasets(
     datasets=datasets, 
     batch_size=cfg['batch_size'], 
@@ -48,6 +51,8 @@ def mainFedOAP(args,cfg):
     val_ratio=cfg['val_ratio']
   )
   
+  log(INFO,'Data loaders are created')
+
   # Define Clients
   client_function = generate_client_function(
     strategy=args.strategy,
@@ -73,7 +78,7 @@ def mainFedOAP(args,cfg):
       strategy=args.strategy,
       input_channels=cfg['input_channels'], 
       num_classes=cfg['num_classes'], 
-      val_dataloaders=val_dataloaders,
+      val_dataloaders=test_dataloaders,
       output_dir=cfg['output_dir'], 
       random_seed=cfg['random_seed']
     )
@@ -97,11 +102,13 @@ def mainFedOAP(args,cfg):
     temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
     for path in temporaryWeightsPaths:
       os.remove(path)
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
     exit()
   finally:
     temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
     for path in temporaryWeightsPaths:
       os.remove(path)
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
 
   try:
     log(INFO, "Going into Finetuning")
@@ -178,7 +185,7 @@ def mainFedDP(args,cfg):
       strategy=args.strategy,
       input_channels=cfg['input_channels'], 
       num_classes=cfg['num_classes'], 
-      val_dataloaders=val_dataloaders,
+      val_dataloaders=test_dataloaders,
       output_dir=cfg['output_dir'], 
       random_seed=cfg['random_seed']
     )
@@ -202,11 +209,13 @@ def mainFedDP(args,cfg):
     temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
     for path in temporaryWeightsPaths:
       os.remove(path)
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
     exit()
   finally:
     queryWeightsPaths = glob.glob('temporaryWeights/*.pth')
     for weight_path in queryWeightsPaths:
       os.remove(weight_path)
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
 
 
   try:
@@ -284,7 +293,7 @@ def mainFedAVG(args,cfg):
       strategy=args.strategy,
       input_channels=cfg['input_channels'], 
       num_classes=cfg['num_classes'], 
-      val_dataloaders=val_dataloaders,
+      val_dataloaders=test_dataloaders,
       output_dir=cfg['output_dir'], 
       random_seed=cfg['random_seed']
     )
@@ -305,6 +314,7 @@ def mainFedAVG(args,cfg):
   except Exception as e:
     print(f"While simulating an error has occured : {e}")
     traceback.print_exc()
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
     exit()
   
   results = []
