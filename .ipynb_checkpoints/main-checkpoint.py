@@ -68,9 +68,9 @@ def mainFedOAP(args,cfg):
 
   #Define Strategy
   strategy = fl.server.strategy.FedAvg(
-    fraction_fit=0.0001, 
+    fraction_fit=1.0, 
     min_fit_clients=cfg['num_clients_per_round_fit'], 
-    fraction_evaluate=0.0001, 
+    fraction_evaluate=1.0, 
     min_evaluate_clients=cfg['num_clients_per_round_eval'], 
     min_available_clients=cfg['num_clients'], 
     on_fit_config_fn=get_on_fit_config_function(cfg['config_fit']),
@@ -175,9 +175,9 @@ def mainFedDP(args,cfg):
   
   #Define Strategy
   strategy = fl.server.strategy.FedAvg(
-    fraction_fit=0.0001, 
+    fraction_fit=1.0, 
     min_fit_clients=cfg['num_clients_per_round_fit'], 
-    fraction_evaluate=0.0001, 
+    fraction_evaluate=1.0, 
     min_evaluate_clients=cfg['num_clients_per_round_eval'], 
     min_available_clients=cfg['num_clients'], 
     on_fit_config_fn=get_on_fit_config_function(cfg['config_fit']),
@@ -316,6 +316,8 @@ def mainFedAVG(args,cfg):
     traceback.print_exc()
     os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
     exit()
+  finally:
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
   
   results = []
   model = UNet(
@@ -340,7 +342,114 @@ def mainFedAVG(args,cfg):
     for idx in range(cfg['num_clients']):
       if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx]}')
       else : f.write(f'client {idx} has dice score {results[idx]}')
+
+
+def mainFedADAGRAD(args,cfg):
+  # Parse config file and print it out
+  log(INFO,'The config that is followed for this run')
+  log(INFO, cfg)
+
+  # Check if CUDA is available and log it
+  if torch.cuda.is_available():
+      log(INFO,"Running on CUDA compatible GPU")
+  else:
+      log(INFO,"Running on CPU")
+  
+  # Load Datasets
+  datasets = load_datasets(cfg['dataset_dirs'], cfg['image_size'])
+  log(INFO, "Datasets loaded. Number of datasets: %s", len(datasets))
+  train_dataloaders, val_dataloaders, test_dataloaders = prepare_datasets(
+    datasets=datasets, 
+    batch_size=cfg['batch_size'], 
+    num_clients=cfg['num_clients'], 
+    random_seed=cfg['random_seed'], 
+    train_ratio=cfg['train_ratio'], 
+    val_ratio=cfg['val_ratio']
+  )
+  
+  # Define Clients
+  client_function = generate_client_function(
+    strategy=args.strategy,
+    train_dataloaders=train_dataloaders, 
+    val_dataloaders=val_dataloaders, 
+    input_channels=cfg['input_channels'], 
+    num_classes=cfg['num_classes'], 
+    output_dir=cfg['output_dir'],
+    random_seed=cfg['random_seed']
+  )
+
+  initial_model = UNet(
+    in_channels=cfg['input_channels'],
+    num_classes=cfg['num_classes'],
+    random_seed=cfg['random_seed']
+  )
+  initial_parameters = fl.common.ndarrays_to_parameters([val.cpu().numpy() for val in initial_model.state_dict().values()])
+  
+  #Define Strategy
+  strategy = fl.server.strategy.FedAdagrad(
+    initial_parameters = initial_parameters, 
+    min_fit_clients=cfg['num_clients_per_round_fit'],
+    fraction_fit=1.0,
+    eta=0.001,
+    tau=1e-7,
+    fraction_evaluate=1.0, 
+    min_evaluate_clients=cfg['num_clients_per_round_eval'], 
+    min_available_clients=cfg['num_clients'], 
+    on_fit_config_fn=get_on_fit_config_function(cfg['config_fit']),
+    evaluate_fn=get_eval_function(
+      strategy=args.strategy,
+      input_channels=cfg['input_channels'], 
+      num_classes=cfg['num_classes'], 
+      val_dataloaders=test_dataloaders,
+      output_dir=cfg['output_dir'], 
+      random_seed=cfg['random_seed']
+    )
+  )
+  
+  # Start Simulation
+  try:
+    history = fl.simulation.start_simulation(
+        client_fn=client_function,
+        num_clients=cfg['num_clients'],
+        config=fl.server.ServerConfig(num_rounds=cfg['num_rounds']),
+        strategy=strategy,
+        client_resources={
+            "num_cpus": 2,
+            "num_gpus": 1
+        }
+    )
+  except Exception as e:
+    print(f"While simulating an error has occured : {e}")
+    traceback.print_exc()
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+    exit()
+  finally:
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+  
+  results = []
+  model = UNet(
+    in_channels=cfg['input_channels'],
+    num_classes=cfg['num_classes'],
+    random_seed=cfg['random_seed']
+  )
+  for idx in range(cfg['num_clients']):
+    model.eval()
+    model.to(device)
+    
+    with torch.no_grad():
+      loop = tqdm(test_dataloaders[idx])
       
+      for images, masks in loop:
+        images, masks = images.to(device), masks.to(device)
+        outputs = model(images)
+        iou, dice = iou_dice_score(outputs, masks)
+        results.append(dice)
+  
+  with open(os.path.join(cfg['output_dir'],'results.txt'),'w') as f:
+    for idx in range(cfg['num_clients']):
+      if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx]}')
+      else : f.write(f'client {idx} has dice score {results[idx]}')
+
             
 if __name__ == "__main__":
 
@@ -366,5 +475,7 @@ if __name__ == "__main__":
     mainFedDP(args,cfg)
   elif args.strategy == 'fedAVG':
     mainFedAVG(args,cfg)
+  elif args.strategy == 'fedADAGRAD':
+    mainFedADAGRAD(args,cfg)
   else :
     print('The given strategy is not yet implemented.')
