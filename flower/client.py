@@ -548,7 +548,18 @@ def generate_client_function(strategy, train_dataloaders, val_dataloaders, input
             output_dir=output_dir, 
             random_seed=random_seed
           )
+        elif strategy == 'fedADAGRAD':
+          return FlowerClientFedAVG(
+            client_id=int(client_id),
+            train_dataloader=train_dataloaders[int(client_id)], 
+            val_dataloader=val_dataloaders[int(client_id)], 
+            input_channels=input_channels, 
+            num_classes=num_classes, 
+            output_dir=output_dir, 
+            random_seed=random_seed
+          )
         else :
-           print('the client function for given strategy is yet to be implemented')
+         print('the client function for given strategy is yet to be implemented')
+         exit() 
     
     return client_function

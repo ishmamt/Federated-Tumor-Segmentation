@@ -130,5 +130,8 @@ def get_eval_function(strategy, input_channels, num_classes, val_dataloaders, ou
       return evalFunctuionFedDP
     elif strategy == 'fedAVG':
       return evalFunctionFedAVG
+    elif strategy == 'fedADAGRAD':
+      return evalFunctionFedAVG
     else:
       print('The given strategy is yet to be implemented')
+      exit()
