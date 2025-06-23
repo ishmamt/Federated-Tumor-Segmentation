@@ -195,10 +195,10 @@ def fedrep_test(model, val_dataloader, device):
             loss = criterion(outputs, masks)
             total_itr += 1
             iu, dc = iou_dice_score(outputs, masks)
-            iuo += iu
+            iou += iu
             dice += dc
             loss_avg += loss.item()
             loop.set_postfix({"IoU": iu, "Dice": dc, "loss": loss.item()})
             
 
-    return loss_avg, iou, dice
+    return loss_avg/total_itr, iou/total_itr, dice/total_itr

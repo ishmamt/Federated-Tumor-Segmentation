@@ -17,6 +17,7 @@
 data/
 CVC-ColonDB
 __pycache__
+*__pycache__
 resized_data
 
 # zipped dataset

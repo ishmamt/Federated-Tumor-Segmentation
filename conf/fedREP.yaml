@@ -14,7 +14,7 @@ random_seed: 42
 # Dataset configurations
 train_ratio: 0.9
 val_ratio: 0.1
-output_dir: "outputs/fedAVG"
+output_dir: "outputs/fedREP"
 dataset_dirs: 
   breadm: 'datasets/resized_data/breadm'
   brats: 'datasets/resized_data/brats'
@@ -28,5 +28,5 @@ config_fit:
   local_epochs: 1
   rep_epochs: 1
   
-finetune_epcohs: 2
-val_per_epch: 1
+finetune_epochs: 2
+val_per_epoch: 1

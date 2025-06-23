@@ -383,7 +383,7 @@ class FlowerClientFedDP(fl.client.NumPyClient):
 
 
 
-class FlowerClientFedREP(fl.client.NumpyClient):
+class FlowerClientFedREP(fl.client.NumPyClient):
     def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
         """
         Creates a FlowerClient object to simulate a client.
@@ -508,7 +508,7 @@ class FlowerClientFedREP(fl.client.NumpyClient):
         self.set_parameters(params)  # Update model parameters from the server
         self.set_head()
         
-        loss, iou, dice = fedrep_test(self.model, self.val_dataloader, cfg, self.device)
+        loss, iou, dice = fedrep_test(self.model, self.val_dataloader, self.device)
 
         best_dice_path = os.path.join(self.output_dir,'best_dice.json')
         if os.path.exists(best_dice_path):

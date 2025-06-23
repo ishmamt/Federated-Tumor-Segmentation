@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torch.optim import AdamW, lr_scheduler
 from flwr.common import NDArrays
 
-from utils import iou_dice_score
+from metrics import iou_dice_score
 from loss import BCEDiceLoss
 
 
@@ -463,7 +463,7 @@ class UnetHead(nn.Module):
 
 class UnetFedRep(nn.Module):
     def __init__(self, in_channels=1, num_classes=1):
-        super.__init__()
+        super().__init__()
         self.body = UnetBody(in_channels=in_channels)
         self.head = UnetHead(num_classes=num_classes)
     

@@ -12,6 +12,7 @@ from loss import BCEDiceLoss
 from utils import AvgMeter,weighted_bce_loss,compute_pred_uncertainty
 from models.fedOAP import UNetWithCrossAttention
 from models.fedDP import UNetWithAttention
+from models.fedREP import UnetFedRep
 from datasets.dataset import prepare_datasets, load_datasets
 
 
@@ -417,6 +418,199 @@ class FineTuneFedDP():
       test_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
       self.clients[idx].load_state_dict(
               torch.load(os.path.join(self.output_dir,f'fedDPfinetuned{idx}.pth'))
+      )
+      self.clients[idx].eval()
+      self.clients[idx].to(self.device)
+      
+      with torch.no_grad():
+        loop = tqdm(self.test_dataloaders[idx])
+        
+        for images, masks in loop:
+          images, masks = images.to(self.device), masks.to(self.device)
+          outputs = self.clients[idx](images)
+          
+          iou, dice = iou_dice_score(outputs, masks)
+          loss = criterion(outputs, masks).item()
+          
+          test_avg_meters["loss"].update(loss)
+          test_avg_meters["iou"].update(iou)
+          test_avg_meters["dice"].update(dice)
+          
+          loop.set_postfix({"IoU": iou, "Dice": dice, "loss": loss})
+      
+        results.append((
+          test_avg_meters["loss"].avg, 
+          test_avg_meters["iou"].avg, 
+          test_avg_meters["dice"].avg
+        ))
+    
+    with open(os.path.join(self.output_dir,'results.txt'),'w') as f:
+      for idx in range(self.num_clients):
+        if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx][2]}')
+        else : f.write(f'client {idx} has dice score {results[idx][2]}')
+
+
+
+class FineTuneFedREP():
+  def __init__(self,
+      train_dataloaders,
+      val_dataloaders,
+      test_dataloaders,
+      config_fit,
+      device,
+      output_dir,
+      epochs=10,
+      val_per_epoch=1,
+      in_channels=3, 
+      num_classes=1
+    ):
+    self.train_dataloaders = train_dataloaders
+    self.val_dataloaders = val_dataloaders
+    self.test_dataloaders = test_dataloaders
+    self.config_fit = config_fit
+    self.device = device
+    self.output_dir = output_dir
+    self.epochs = epochs
+    self.val_per_epoch = val_per_epoch
+    self.in_channels = in_channels
+    self.num_classes = num_classes
+    self.num_clients = len(train_dataloaders)
+    self.clients = self.init_models()
+    self.optimizers, self.schedulers = self.init_opt_sch()
+    self.clientsForIgc = deepcopy(self.clients)
+    for ix in range(self.num_clients):
+        self.clientsForIgc[ix].to(self.device)
+
+  def init_models(self):
+    clients = []
+
+    for idx in range(self.num_clients):
+      client = UnetFedRep(
+        in_channels=self.in_channels,
+        num_classes=self.num_classes
+      )
+
+      serverPath = os.path.join(self.output_dir,'fedREPserver.pth')
+      if os.path.exists(serverPath):
+        log(INFO, f'loading server weights for client {idx}')
+        client.load_state_dict(torch.load(serverPath))
+      else:
+        log(INFO, f"server weights for client {idx} is not found")
+
+      headWeightsPath = os.path.join(self.output_dir,f'fedREPhead{idx}.pth')
+      if os.path.exists(headWeightsPath):
+        log(INFO, f'loading head weights for client {idx}')
+        client.head.load_state_dict(torch.load(headWeightsPath))
+      else:
+        log(INFO, f"head weights for client {idx} is not found")
+      
+      client.to(self.device)
+      clients.append(client)
+    
+    return clients
+  
+  def init_opt_sch(self):
+    optimizers = []
+    schedulers = []
+
+    for idx in range(self.num_clients):
+      optimizer = AdamW(
+        self.clients[idx].parameters(), 
+        lr=self.config_fit['lr'], 
+        weight_decay=self.config_fit['weight_decay']
+      )
+      scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, 
+        T_0=10, 
+        T_mult=2, 
+        eta_min=self.config_fit['min_lr']
+      )
+
+      optimizers.append(optimizer)
+      schedulers.append(scheduler)
+
+    return optimizers, schedulers
+
+  def train(self):
+    histories = []
+    for idx in range(self.num_clients):
+      criterion = BCEDiceLoss()
+      self.clients[idx].train()
+      
+      train_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
+      history = {"epoch": [], 
+                  "lr": [],
+                  "train_loss": [],
+                  "train_iou": [],
+                  "train_dice": []
+                  }
+      best_dice = -1.0
+      for epoch in range(self.epochs):
+          print(f"Epoch {epoch} / {self.epochs}:\n")
+          loop = tqdm(self.train_dataloaders[idx])
+
+          for images, masks in loop:
+              images, masks = images.to(self.device), masks.to(self.device)
+              
+              self.optimizers[idx].zero_grad()
+              outputs = self.clients[idx](images)
+
+              loss = criterion(outputs, masks)
+              iou, dice = iou_dice_score(outputs, masks)
+      
+              loss.backward()
+              self.optimizers[idx].step()
+              
+              train_avg_meters["loss"].update(loss.item())
+              train_avg_meters["iou"].update(iou)
+              train_avg_meters["dice"].update(dice)
+              
+              loop.set_postfix({"IoU": iou, "Dice": dice, "loss": loss.item()})
+          
+          self.schedulers[idx].step()
+
+          if (epoch % self.val_per_epoch) == 0:
+            dice = self.val(self.clients[idx],idx)
+            if dice > best_dice:
+              best_dice = dice
+              torch.save(
+                self.clients[idx].state_dict(),
+                os.path.join(self.output_dir,f'fedREPfinetuned{idx}.pth')
+              )
+          
+          # Updating history
+          history["epoch"].append(epoch)
+          history["lr"].append(self.schedulers[idx].get_last_lr()[0])
+          history["train_loss"].append(train_avg_meters["loss"].avg)
+          history["train_iou"].append(train_avg_meters["iou"].avg)
+          history["train_dice"].append(train_avg_meters["dice"].avg)
+          
+      histories.append(history)
+    return histories
+
+  def val(self,client,ix):
+    test_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
+    client.eval()
+    client.to(self.device)
+    
+    with torch.no_grad():
+      loop = tqdm(self.val_dataloaders[ix])
+      
+      for images, masks in loop:
+        images, masks = images.to(self.device), masks.to(self.device)
+        outputs = client(images)
+        iou, dice = iou_dice_score(outputs, masks)
+        test_avg_meters["dice"].update(dice)
+      return test_avg_meters["dice"].avg
+    
+  def test(self):
+    results = []
+    self.clients = self.init_models()
+    for idx in range(self.num_clients):
+      criterion = BCEDiceLoss()
+      test_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
+      self.clients[idx].load_state_dict(
+              torch.load(os.path.join(self.output_dir,f'fedREPfinetuned{idx}.pth'))
       )
       self.clients[idx].eval()
       self.clients[idx].to(self.device)
