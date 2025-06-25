@@ -10,6 +10,7 @@ from torch.optim import Adam,AdamW,lr_scheduler
 
 from models.UNet import UNet
 from models.fedREP import UnetFedRep
+from models.fedPER import UnetFedPer
 from models.fedDP import UNetWithAttention
 from models.fedOAP import UNetWithCrossAttention
 from train import train, test, fedrep_train, fedrep_test
@@ -532,6 +533,166 @@ class FlowerClientFedREP(fl.client.NumPyClient):
         return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
 
 
+class FlowerClientFedPER(fl.client.NumPyClient):
+    def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
+        """
+        Creates a FlowerClient object to simulate a client.
+        
+        Arguments:
+        train_dataloader (DataLoader): DataLoader for training data on a single client.
+        val_dataloader (DataLoader): DataLoader for validation data on a single client.
+        input_channels (int): Number of input channels in the model.
+        num_classes (int): Number of classes in the dataset.
+        random_seed (int): Random seed for reproducibility.
+        """
+        
+        super().__init__()
+        self.client_id = client_id
+        self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
+        self.in_channels = input_channels
+        self.num_classes = num_classes
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.output_dir = output_dir
+        self.model = UnetFedPer(
+          in_channels =  self.in_channels,
+          num_classes = self.num_classes
+        )
+        self.temporaryWeightsPath = 'temporaryWeights'
+        self.headWeightsPath = os.path.join(self.temporaryWeightsPath, f'fedPERhead{self.client_id}.pth')
+        self.modelWeightsPath = os.path.join(self.temporaryWeightsPath,f'fedPERserver.pth')
+
+    def set_parameters(self, params):
+        """
+        Updates the model parameters using the given numpy arrays.
+        
+        Arguments:
+        params (list): List of numpy arrays representing the model parameters.
+        """
+        
+        params_dict = zip(self.model.state_dict().keys(), params)
+        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        self.model.load_state_dict(state_dict, strict=True)
+        
+    def get_parameters(self, config):
+        """
+        Returns the current model parameters as numpy arrays.
+        
+        Arguments:
+        cfg (dict): Configuration dictionary.
+        
+        Returns:
+        params (list): List of numpy arrays representing the model parameters.
+        """
+        
+        return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
+    
+    def set_head(self):
+      if os.path.exists(self.headWeightsPath):
+          self.model.head.load_state_dict(torch.load(self.headWeightsPath))
+      else:
+          print('head parameter is not found')
+
+    def get_head(self):
+      print('Saving head weights')
+      torch.save(self.model.head.state_dict(), self.headWeightsPath)
+
+    def save_server_model(self):
+      print('saving fedREP server weights')
+      torch.save(self.model.state_dict(),self.modelWeightsPath)
+
+    def copy_best_weights(self):
+      temporaryWeightsPaths = glob.glob(f'temporaryWeights/*{self.client_id}.pth')
+      for path in temporaryWeightsPaths:
+        file_name = path.split('/')[-1]
+        shutil.copy2(path, os.path.join(self.output_dir,file_name))
+      if os.path.exists('temporaryWeights/fedPERserver.pth'):
+        shutil.copy2('temporaryWeights/fedPERserver.pth', os.path.join(self.output_dir,'fedPERserver.pth'))
+       
+
+    def fit(self, params, cfg):
+        """
+        Trains model on a client using the client's data.
+        
+        Arguments:
+        params (list): List of numpy arrays representing the model parameters.
+        cfg (dict): Configuration dictionary.
+        
+        Returns:
+        params (list): List of numpy arrays representing the updated model parameters.
+        length (int): Length of the training dataloader.
+        Dict (dict): Additional information (Training history) to be sent to the server.
+        """
+        
+        self.set_parameters(params)  # Update model parameters from the server
+        self.set_head()
+
+        optimizer = AdamW(self.model.parameters(), lr=cfg['lr'], weight_decay=cfg['weight_decay'])
+        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
+          optimizer, 
+          T_0=10, 
+          T_mult=2, 
+          eta_min=cfg['min_lr']
+        )
+        
+        self.model.enable_body()
+        self.model.enable_head()
+        
+        # Local training
+        history = train(
+          model = self.model, 
+          train_dataloader = self.train_dataloader, 
+          optimizer = optimizer,
+          scheduler = scheduler,
+          epochs = cfg['local_epochs'],
+          device = self.device
+        )
+
+        self.get_head()
+        self.save_server_model()
+        
+        # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
+        return self.get_parameters({}), len(self.train_dataloader), {"history": history}
+    
+    def evaluate(self, params, cfg):
+        """
+        Evaluates the model on the parameters sent by the server.
+        
+        Arguments:
+        params (list): List of numpy arrays representing the model parameters.
+        cfg (dict): Configuration dictionary.
+        
+        Returns:
+        loss (float): Average loss over the validation set.
+        length (int): Length of the validation dataloader.
+        eval_metrics (dict): Additional evaluation metrics (IoU, Dice) to be sent to the server.
+        """
+        
+        self.set_parameters(params)  # Update model parameters from the server
+        self.set_head()
+        
+        loss, iou, dice = test(self.model, self.val_dataloader, self.device)
+
+        best_dice_path = os.path.join(self.output_dir,'best_dice.json')
+        if os.path.exists(best_dice_path):
+          with open(best_dice_path, "r") as f:
+            best_dice_dict = json.load(f)
+        else:
+          best_dice_dict = {
+            '0':-1.0,
+            '1':-1.0,
+            '2':-1.0
+          }
+          with open(best_dice_path, "w") as f:
+              json.dump(best_dice_dict, f, indent=4)
+      
+        if dice > best_dice_dict[str(self.client_id)]:
+          best_dice_dict[str(self.client_id)] = dice
+          self.copy_best_weights()
+          with open(best_dice_path, "w") as f:
+              json.dump(best_dice_dict, f, indent=4)
+
+        return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
 
 class FlowerClientFedAVG(fl.client.NumPyClient):
     def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
@@ -638,7 +799,7 @@ class FlowerClientFedAVG(fl.client.NumPyClient):
       
         if dice > best_dice_dict[str(self.client_id)]:
           best_dice_dict[str(self.client_id)] = dice
-          torch.save(self.model,os.path.join(self.output_dir,'fedAVG.pth'))
+          torch.save(self.model.state_dict(),os.path.join(self.output_dir,'fedAVG.pth'))
           with open(best_dice_path, "w") as f:
               json.dump(best_dice_dict, f, indent=4)
 
@@ -692,6 +853,16 @@ def generate_client_function(strategy, train_dataloaders, val_dataloaders, input
           )
         elif strategy == 'fedREP':
           return FlowerClientFedREP(
+            client_id=int(client_id),
+            train_dataloader=train_dataloaders[int(client_id)], 
+            val_dataloader=val_dataloaders[int(client_id)], 
+            input_channels=input_channels, 
+            num_classes=num_classes, 
+            output_dir=output_dir, 
+            random_seed=random_seed
+          )
+        elif strategy == 'fedPER':
+          return FlowerClientFedPER(
             client_id=int(client_id),
             train_dataloader=train_dataloaders[int(client_id)], 
             val_dataloader=val_dataloaders[int(client_id)], 

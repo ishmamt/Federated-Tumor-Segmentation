@@ -21,6 +21,7 @@ from flower.server import get_on_fit_config_function, get_eval_function
 from metrics import iou_dice_score
 from finetune import FinetuneFedOAP, FineTuneFedDP, FineTuneFedREP
 from models.UNet import UNet
+from models.fedPER import UnetFedPer 
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -275,62 +276,62 @@ def mainFedREP(args,cfg):
     val_ratio=cfg['val_ratio']
   )
   
-  # # Define Clients
-  # client_function = generate_client_function(
-  #   strategy=args.strategy,
-  #   train_dataloaders=train_dataloaders, 
-  #   val_dataloaders=val_dataloaders, 
-  #   input_channels=cfg['input_channels'], 
-  #   num_classes=cfg['num_classes'], 
-  #   output_dir=cfg['output_dir'],
-  #   random_seed=cfg['random_seed']
-  # )
+  # Define Clients
+  client_function = generate_client_function(
+    strategy=args.strategy,
+    train_dataloaders=train_dataloaders, 
+    val_dataloaders=val_dataloaders, 
+    input_channels=cfg['input_channels'], 
+    num_classes=cfg['num_classes'], 
+    output_dir=cfg['output_dir'],
+    random_seed=cfg['random_seed']
+  )
   
-  # #Define Strategy
-  # strategy = fl.server.strategy.FedAvg(
-  #   fraction_fit=1.0, 
-  #   min_fit_clients=cfg['num_clients_per_round_fit'], 
-  #   fraction_evaluate=1.0, 
-  #   min_evaluate_clients=cfg['num_clients_per_round_eval'], 
-  #   min_available_clients=cfg['num_clients'], 
-  #   on_fit_config_fn=get_on_fit_config_function(cfg['config_fit']),
-  #   evaluate_fn=get_eval_function(
-  #     strategy=args.strategy,
-  #     input_channels=cfg['input_channels'], 
-  #     num_classes=cfg['num_classes'], 
-  #     val_dataloaders=test_dataloaders,
-  #     output_dir=cfg['output_dir'], 
-  #     random_seed=cfg['random_seed']
-  #   )
-  # )
+  #Define Strategy
+  strategy = fl.server.strategy.FedAvg(
+    fraction_fit=1.0, 
+    min_fit_clients=cfg['num_clients_per_round_fit'], 
+    fraction_evaluate=1.0, 
+    min_evaluate_clients=cfg['num_clients_per_round_eval'], 
+    min_available_clients=cfg['num_clients'], 
+    on_fit_config_fn=get_on_fit_config_function(cfg['config_fit']),
+    evaluate_fn=get_eval_function(
+      strategy=args.strategy,
+      input_channels=cfg['input_channels'], 
+      num_classes=cfg['num_classes'], 
+      val_dataloaders=test_dataloaders,
+      output_dir=cfg['output_dir'], 
+      random_seed=cfg['random_seed']
+    )
+  )
   
-  # # Start Simulation
-  # try:
-  #   history = fl.simulation.start_simulation(
-  #     client_fn=client_function,
-  #     num_clients=cfg['num_clients'],
-  #     config=fl.server.ServerConfig(num_rounds=cfg['num_rounds']),
-  #     strategy=strategy,
-  #     client_resources={
-  #         "num_cpus": 2,
-  #         "num_gpus": 1
-  #     }
-  #   )
-  # except Exception as e:
-  #   print(f"While simulating an error has occured : {e}")
-  #   traceback.print_exc()
-  #   temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
-  #   for path in temporaryWeightsPaths:
-  #     os.remove(path)
-  #   if os.path.exists(os.path.join(cfg['output_dir'],'best_dice.json')):
-  #     os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
-  #   exit()
-  # finally:
-  #   queryWeightsPaths = glob.glob('temporaryWeights/*.pth')
-  #   for weight_path in queryWeightsPaths:
-  #     os.remove(weight_path)
-  #   if os.path.exists(os.path.join(cfg['output_dir'],'best_dice.json')):
-  #     os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+  # Start Simulation
+  try:
+    history = fl.simulation.start_simulation(
+      client_fn=client_function,
+      num_clients=cfg['num_clients'],
+      config=fl.server.ServerConfig(num_rounds=cfg['num_rounds']),
+      strategy=strategy,
+      client_resources={
+          "num_cpus": 2,
+          "num_gpus": 1
+      }
+    )
+  except Exception as e:
+    print(f"While simulating an error has occured : {e}")
+    traceback.print_exc()
+    temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    for path in temporaryWeightsPaths:
+      os.remove(path)
+    if os.path.exists(os.path.join(cfg['output_dir'],'best_dice.json')):
+      os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+    exit()
+  finally:
+    queryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    for weight_path in queryWeightsPaths:
+      os.remove(weight_path)
+    if os.path.exists(os.path.join(cfg['output_dir'],'best_dice.json')):
+      os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
 
 
   try:
@@ -360,6 +361,120 @@ def mainFedREP(args,cfg):
       os.remove(os.path.join(cfg['output_dir'],'results.txt'))
 
   del trainer
+
+
+
+def mainFedPER(args,cfg):
+  # Parse config file and print it out
+  log(INFO,'The config that is followed for this run')
+  log(INFO, cfg)
+
+  # Check if CUDA is available and log it
+  if torch.cuda.is_available():
+      log(INFO,"Running on CUDA compatible GPU")
+  else:
+      log(INFO,"Running on CPU")
+  
+  # Load Datasets
+  datasets = load_datasets(cfg['dataset_dirs'], cfg['image_size'])
+  log(INFO, "Datasets loaded. Number of datasets: %s", len(datasets))
+  log(INFO, "Number of Clients: %s", len(datasets))
+
+  for ix in range(len(datasets)):
+    log(INFO,f'Number of samples for client {ix} : {datasets[ix].__len__()}')
+
+  train_dataloaders, val_dataloaders, test_dataloaders = prepare_datasets(
+    datasets=datasets, 
+    batch_size=cfg['batch_size'], 
+    num_clients=cfg['num_clients'], 
+    random_seed=cfg['random_seed'], 
+    train_ratio=cfg['train_ratio'], 
+    val_ratio=cfg['val_ratio']
+  )
+  
+  # Define Clients
+  client_function = generate_client_function(
+    strategy=args.strategy,
+    train_dataloaders=train_dataloaders, 
+    val_dataloaders=val_dataloaders, 
+    input_channels=cfg['input_channels'], 
+    num_classes=cfg['num_classes'], 
+    output_dir=cfg['output_dir'],
+    random_seed=cfg['random_seed']
+  )
+  
+  #Define Strategy
+  strategy = fl.server.strategy.FedAvg(
+    fraction_fit=1.0, 
+    min_fit_clients=cfg['num_clients_per_round_fit'], 
+    fraction_evaluate=1.0, 
+    min_evaluate_clients=cfg['num_clients_per_round_eval'], 
+    min_available_clients=cfg['num_clients'], 
+    on_fit_config_fn=get_on_fit_config_function(cfg['config_fit']),
+    evaluate_fn=get_eval_function(
+      strategy=args.strategy,
+      input_channels=cfg['input_channels'], 
+      num_classes=cfg['num_classes'], 
+      val_dataloaders=test_dataloaders,
+      output_dir=cfg['output_dir'], 
+      random_seed=cfg['random_seed']
+    )
+  )
+  
+  # Start Simulation
+  try:
+    history = fl.simulation.start_simulation(
+      client_fn=client_function,
+      num_clients=cfg['num_clients'],
+      config=fl.server.ServerConfig(num_rounds=cfg['num_rounds']),
+      strategy=strategy,
+      client_resources={
+          "num_cpus": 2,
+          "num_gpus": 1
+      }
+    )
+  except Exception as e:
+    print(f"While simulating an error has occured : {e}")
+    traceback.print_exc()
+    temporaryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    for path in temporaryWeightsPaths:
+      os.remove(path)
+    if os.path.exists(os.path.join(cfg['output_dir'],'best_dice.json')):
+      os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+    exit()
+  finally:
+    queryWeightsPaths = glob.glob('temporaryWeights/*.pth')
+    for weight_path in queryWeightsPaths:
+      os.remove(weight_path)
+    if os.path.exists(os.path.join(cfg['output_dir'],'best_dice.json')):
+      os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+
+
+  results = []
+  for idx in range(cfg['num_clients']):
+    test_model = UnetFedPer(
+      in_channels=cfg['input_channels'],
+      num_classes=cfg['num_classes']
+    )
+    test_model.load_state_dict(torch.load(os.path.join(cfg['output_dir'],'fedPERserver.pth')))
+    test_model.head.load_state_dict(torch.load(os.path.join(cfg['output_dir'],f'fedPERhead{idx}.pth')))
+    test_model.eval()
+    test_model.to(device)
+    dice_scores = []
+    with torch.no_grad():
+      loop = tqdm(test_dataloaders[idx])
+      
+      for images, masks in loop:
+        images, masks = images.to(device), masks.to(device)
+        outputs = test_model(images)
+        iou, dice = iou_dice_score(outputs, masks)
+        dice_scores.append(dice)
+    results.append(torch.tensor(dice_scores).mean().item())
+    
+  with open(os.path.join(cfg['output_dir'],'results.txt'),'w') as f:
+    for idx in range(cfg['num_clients']):
+      if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx]}')
+      else : f.write(f'client {idx} has dice score {results[idx]}')
 
 
 
@@ -436,29 +551,130 @@ def mainFedAVG(args,cfg):
     os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
   
   results = []
-  model = UNet(
+  test_model = UNet(
     in_channels=cfg['input_channels'],
     num_classes=cfg['num_classes'],
     random_seed=cfg['random_seed']
   )
+  test_model.load_state_dict(torch.load(os.path.join(cfg['output_dir'],'fedAVG.pth')))
   for idx in range(cfg['num_clients']):
-    model.eval()
-    model.to(device)
-    
+    test_model.eval()
+    test_model.to(device)
+    dice_scores = []
     with torch.no_grad():
       loop = tqdm(test_dataloaders[idx])
       
       for images, masks in loop:
         images, masks = images.to(device), masks.to(device)
-        outputs = model(images)
+        outputs = test_model(images)
         iou, dice = iou_dice_score(outputs, masks)
-        results.append(dice)
+        dice_scores.append(dice)
+    results.append(torch.tensor(dice_scores).mean().item())
   
   with open(os.path.join(cfg['output_dir'],'results.txt'),'w') as f:
     for idx in range(cfg['num_clients']):
       if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx]}')
       else : f.write(f'client {idx} has dice score {results[idx]}')
 
+
+
+def mainFedAVGM(args,cfg):
+  # Parse config file and print it out
+  log(INFO,'The config that is followed for this run')
+  log(INFO, cfg)
+
+  # Check if CUDA is available and log it
+  if torch.cuda.is_available():
+      log(INFO,"Running on CUDA compatible GPU")
+  else:
+      log(INFO,"Running on CPU")
+  
+  # Load Datasets
+  datasets = load_datasets(cfg['dataset_dirs'], cfg['image_size'])
+  log(INFO, "Datasets loaded. Number of datasets: %s", len(datasets))
+  train_dataloaders, val_dataloaders, test_dataloaders = prepare_datasets(
+    datasets=datasets, 
+    batch_size=cfg['batch_size'], 
+    num_clients=cfg['num_clients'], 
+    random_seed=cfg['random_seed'], 
+    train_ratio=cfg['train_ratio'], 
+    val_ratio=cfg['val_ratio']
+  )
+  
+  # Define Clients
+  client_function = generate_client_function(
+    strategy=args.strategy,
+    train_dataloaders=train_dataloaders, 
+    val_dataloaders=val_dataloaders, 
+    input_channels=cfg['input_channels'], 
+    num_classes=cfg['num_classes'], 
+    output_dir=cfg['output_dir'],
+    random_seed=cfg['random_seed']
+  )
+    
+  #Define Strategy
+  strategy = fl.server.strategy.FedAvgM(
+    fraction_fit=0.0001, 
+    min_fit_clients=cfg['num_clients_per_round_fit'], 
+    fraction_evaluate=0.0001, 
+    min_evaluate_clients=cfg['num_clients_per_round_eval'], 
+    min_available_clients=cfg['num_clients'], 
+    on_fit_config_fn=get_on_fit_config_function(cfg['config_fit']),
+    evaluate_fn=get_eval_function(
+      strategy=args.strategy,
+      input_channels=cfg['input_channels'], 
+      num_classes=cfg['num_classes'], 
+      val_dataloaders=test_dataloaders,
+      output_dir=cfg['output_dir'], 
+      random_seed=cfg['random_seed']
+    )
+  )
+  
+  # Start Simulation
+  try:
+    history = fl.simulation.start_simulation(
+        client_fn=client_function,
+        num_clients=cfg['num_clients'],
+        config=fl.server.ServerConfig(num_rounds=cfg['num_rounds']),
+        strategy=strategy,
+        client_resources={
+            "num_cpus": 2,
+            "num_gpus": 1
+        }
+    )
+  except Exception as e:
+    print(f"While simulating an error has occured : {e}")
+    traceback.print_exc()
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+    exit()
+  finally:
+    os.remove(os.path.join(cfg['output_dir'],'best_dice.json'))
+  
+  results = []
+  test_model = UNet(
+    in_channels=cfg['input_channels'],
+    num_classes=cfg['num_classes'],
+    random_seed=cfg['random_seed']
+  )
+  test_model.load_state_dict(torch.load(os.path.join(cfg['output_dir'],'fedAVG.pth')))
+  for idx in range(cfg['num_clients']):
+    test_model.eval()
+    test_model.to(device)
+    dice_scores = []
+    with torch.no_grad():
+      loop = tqdm(test_dataloaders[idx])
+      
+      for images, masks in loop:
+        images, masks = images.to(device), masks.to(device)
+        outputs = test_model(images)
+        iou, dice = iou_dice_score(outputs, masks)
+        dice_scores.append(dice)
+    results.append(torch.tensor(dice_scores).mean().item())
+  
+  with open(os.path.join(cfg['output_dir'],'results.txt'),'w') as f:
+    for idx in range(cfg['num_clients']):
+      if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx]}')
+      else : f.write(f'client {idx} has dice score {results[idx]}')
 
 def mainFedADAGRAD(args,cfg):
   # Parse config file and print it out
@@ -574,6 +790,7 @@ if __name__ == "__main__":
   # parser.add_argument('--number', type=int, required=True, help='An integer value')
   parser.add_argument('--strategy', type=str, required=True, help='Defining strategy like fedAvg or fedDP')
   parser.add_argument('--conf-path',type=str, default='conf', help='Defining path for configs dir')
+  parser.add_argument('--run',type=int, default=0, help='Defining on which run the algorithm is')
   # parser.add_argument('--score', type=float, required=True, help='A float value')
 
   args = parser.parse_args()
@@ -591,6 +808,8 @@ if __name__ == "__main__":
     mainFedDP(args,cfg)
   elif args.strategy == 'fedREP':
     mainFedREP(args,cfg)
+  elif args.strategy == 'fedPER':
+    mainFedPER(args,cfg)
   elif args.strategy == 'fedAVG':
     mainFedAVG(args,cfg)
   elif args.strategy == 'fedADAGRAD':

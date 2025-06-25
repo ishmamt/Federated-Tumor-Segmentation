@@ -1,5 +1,6 @@
 # python main.py --strategy fedOAP 2>&1 | tee logs/fedOAP.txt
 # python main.py --strategy fedDP 2>&1 | tee logs/fedDP.txt
-python main.py --strategy fedREP 2>&1 | tee logs/fedREP.txt
-# python main.py --strategy fedAVG 2>&1 | tee logs/fedAVG.txt
+# python main.py --strategy fedREP 2>&1 | tee logs/fedREP.txt
+# python main.py --strategy fedPER 2>&1 | tee logs/fedPER.txt
+python main.py --strategy fedAVG 2>&1 | tee logs/fedAVG.txt
 # python main.py --strategy fedADAGRAD 2>&1 | tee logs/fedADAGRAD.txt

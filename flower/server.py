@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from collections import OrderedDict
 
-from flower.client import FlowerClientFedOAP, FlowerClientFedDP, FlowerClientFedREP, FlowerClientFedAVG
+from flower.client import FlowerClientFedOAP, FlowerClientFedDP, FlowerClientFedREP, FlowerClientFedPER, FlowerClientFedAVG
 
 def get_on_fit_config_function(cfg):
     """
@@ -31,7 +31,7 @@ def get_on_fit_config_function(cfg):
                 "min_lr": cfg['min_lr'], 
                 "weight_decay": cfg['weight_decay'], 
                 "local_epochs": cfg['local_epochs'],
-                "rep_epochs": cfg['rep_epochs']
+                "rep_epochs": cfg.get('rep_epochs',0)
                 }
     
     return on_fit_config_function
@@ -127,6 +127,32 @@ def get_eval_function(strategy, input_channels, num_classes, val_dataloaders, ou
       return np.mean(loss_list), {"iou": iou_list, "dice": dice_list, "loss": loss_list}
 
 
+    def evalFunctionFedPER(server_round, params, cfg):
+      loss_list = list()
+      iou_list = list()
+      dice_list = list()
+
+      for idx,val_dataloader in enumerate(val_dataloaders):
+
+        modelServerEval = FlowerClientFedPER(
+          client_id = idx,  
+          train_dataloader=None, 
+          val_dataloader=val_dataloader, 
+          input_channels=input_channels, 
+          num_classes=num_classes, 
+          output_dir=output_dir, 
+          random_seed=random_seed
+        )
+
+        loss, lenVal, accDict = modelServerEval.evaluate(params,{})
+
+        loss_list.append(float(loss))
+        iou_list.append(accDict['iou'])
+        dice_list.append(accDict['dice'])
+
+      return np.mean(loss_list), {"iou": iou_list, "dice": dice_list, "loss": loss_list}
+  
+
     def evalFunctionFedAVG(server_round, params, cfg):
       loss_list = list()
       iou_list = list()
@@ -159,6 +185,8 @@ def get_eval_function(strategy, input_channels, num_classes, val_dataloaders, ou
       return evalFunctuionFedDP
     elif strategy == 'fedREP':
       return evalFunctionFedREP
+    elif strategy == 'fedPER':
+      return evalFunctionFedPER 
     elif strategy == 'fedAVG':
       return evalFunctionFedAVG
     elif strategy == 'fedADAGRAD':
