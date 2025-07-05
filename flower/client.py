@@ -758,10 +758,21 @@ class FlowerClientFedAVG(fl.client.NumPyClient):
         self.set_parameters(params)  # Update model parameters from the server
         
         optimizer = Adam(self.model.parameters(), lr=cfg["lr"], weight_decay=cfg["weight_decay"])
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg["local_epochs"], eta_min=cfg["min_lr"])
+        scheduler = lr_scheduler.CosineAnnealingLR(
+            optimizer, 
+            T_max=cfg["local_epochs"], 
+            eta_min=cfg["min_lr"]
+        )
         
         # Local training
-        history = train(self.model, self.train_dataloader, optimizer, scheduler, cfg["local_epochs"], self.device)
+        history = train(
+            self.model, 
+            self.train_dataloader, 
+            optimizer, 
+            scheduler, 
+            cfg["local_epochs"], 
+            self.device
+        )
         
         # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
         return self.get_parameters({}), len(self.train_dataloader), {"history": history}
@@ -806,7 +817,14 @@ class FlowerClientFedAVG(fl.client.NumPyClient):
         return float(loss), len(self.val_dataloader), {"iou": iou, "dice": dice}
     
     
-def generate_client_function(strategy, train_dataloaders, val_dataloaders, input_channels, num_classes, output_dir, random_seed):
+def generate_client_function(
+    strategy,
+    train_dataloaders,
+    val_dataloaders, 
+    input_channels, 
+    num_classes, 
+    output_dir, 
+    random_seed):
     """
     Provides a client function that the server can evoke to spawn clients.
     
@@ -872,6 +890,16 @@ def generate_client_function(strategy, train_dataloaders, val_dataloaders, input
             random_seed=random_seed
           )
         elif strategy == 'fedAVG':
+          return FlowerClientFedAVG(
+            client_id=int(client_id),
+            train_dataloader=train_dataloaders[int(client_id)], 
+            val_dataloader=val_dataloaders[int(client_id)], 
+            input_channels=input_channels, 
+            num_classes=num_classes, 
+            output_dir=output_dir, 
+            random_seed=random_seed
+          )
+        elif strategy == 'fedAVGM':
           return FlowerClientFedAVG(
             client_id=int(client_id),
             train_dataloader=train_dataloaders[int(client_id)], 

@@ -1,0 +1,3 @@
+client 0 has dice score 0.7740764988163988
+client 1 has dice score :0.4460594134554076
+client 2 has dice score :0.21792891836623526

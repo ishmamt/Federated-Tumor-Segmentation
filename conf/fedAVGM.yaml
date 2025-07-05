@@ -14,7 +14,7 @@ server_learning_rate:
 # Dataset configurations
 train_ratio: 0.9
 val_ratio: 0.1
-output_dir: "outputs/fedAVG"
+output_dir: "outputs/fedAVGM"
 dataset_dirs: 
   breadm: 'datasets/resized_data/breadm'
   brats: 'datasets/resized_data/brats'

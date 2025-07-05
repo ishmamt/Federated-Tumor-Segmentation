@@ -189,6 +189,8 @@ def get_eval_function(strategy, input_channels, num_classes, val_dataloaders, ou
       return evalFunctionFedPER 
     elif strategy == 'fedAVG':
       return evalFunctionFedAVG
+    elif strategy == 'fedAVGM':
+      return evalFunctionFedAVG
     elif strategy == 'fedADAGRAD':
       return evalFunctionFedAVG
     else:

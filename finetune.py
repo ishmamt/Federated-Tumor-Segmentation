@@ -3,6 +3,7 @@ from tqdm import tqdm
 from flwr.common.logger import log
 from logging import INFO
 import yaml
+import json
 import os
 from copy import deepcopy
 from torch.optim import AdamW,lr_scheduler
@@ -29,6 +30,7 @@ class FinetuneFedOAP():
       val_per_epoch=1,
       in_channels=3, 
       num_classes=1,
+      run=1,
       error_threshold=0.75,
       noisy_loss_threshold=0.1
     ):
@@ -44,6 +46,7 @@ class FinetuneFedOAP():
     self.device = device
     self.output_dir = output_dir
     self.epochs = epochs
+    self.run = run
     self.val_per_epoch = val_per_epoch
     self.error_threshold = error_threshold
     self.noisy_loss_threshold = noisy_loss_threshold
@@ -244,10 +247,15 @@ class FinetuneFedOAP():
           test_avg_meters["dice"].avg
         ))
     
-    with open(os.path.join(self.output_dir,'results.txt'),'w') as f:
-      for idx in range(self.num_clients):
-        if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx][2]}')
-        else : f.write(f'client {idx} has dice score {results[idx][2]}')
+    result_dict = {
+      '0':-1.0,
+      '1':-1.0,
+      '2':-1.0
+    }
+    for idx in range(self.num_clients):
+        result_dict[str(idx)] = results[idx][2]
+    with open(os.path.join(self.output_dir,f'results{self.run}.json'), "w") as f:
+        json.dump(result_dict, f, indent=4)
 
 
 
@@ -262,7 +270,8 @@ class FineTuneFedDP():
       epochs=10,
       val_per_epoch=1,
       in_channels=3, 
-      num_classes=1
+      num_classes=1,
+      run=1
     ):
     self.train_dataloaders = train_dataloaders
     self.val_dataloaders = val_dataloaders
@@ -274,6 +283,7 @@ class FineTuneFedDP():
     self.val_per_epoch = val_per_epoch
     self.in_channels = in_channels
     self.num_classes = num_classes
+    self.run = run
     self.num_clients = len(train_dataloaders)
     self.clients = self.init_models()
     self.optimizers, self.schedulers = self.init_opt_sch()
@@ -444,10 +454,15 @@ class FineTuneFedDP():
           test_avg_meters["dice"].avg
         ))
     
-    with open(os.path.join(self.output_dir,'results.txt'),'w') as f:
-      for idx in range(self.num_clients):
-        if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx][2]}')
-        else : f.write(f'client {idx} has dice score {results[idx][2]}')
+    result_dict = {
+      '0':-1.0,
+      '1':-1.0,
+      '2':-1.0
+    }
+    for idx in range(self.num_clients):
+        result_dict[str(idx)] = results[idx][2]
+    with open(os.path.join(self.output_dir,f'results{self.run}.json'), "w") as f:
+        json.dump(result_dict, f, indent=4)
 
 
 
@@ -462,7 +477,8 @@ class FineTuneFedREP():
       epochs=10,
       val_per_epoch=1,
       in_channels=3, 
-      num_classes=1
+      num_classes=1,
+      run=1
     ):
     self.train_dataloaders = train_dataloaders
     self.val_dataloaders = val_dataloaders
@@ -474,6 +490,7 @@ class FineTuneFedREP():
     self.val_per_epoch = val_per_epoch
     self.in_channels = in_channels
     self.num_classes = num_classes
+    self.run = run
     self.num_clients = len(train_dataloaders)
     self.clients = self.init_models()
     self.optimizers, self.schedulers = self.init_opt_sch()
@@ -637,10 +654,15 @@ class FineTuneFedREP():
           test_avg_meters["dice"].avg
         ))
     
-    with open(os.path.join(self.output_dir,'results.txt'),'w') as f:
-      for idx in range(self.num_clients):
-        if idx > 0 : f.write(f'\nclient {idx} has dice score :{results[idx][2]}')
-        else : f.write(f'client {idx} has dice score {results[idx][2]}')
+    result_dict = {
+      '0':-1.0,
+      '1':-1.0,
+      '2':-1.0
+    }
+    for idx in range(self.num_clients):
+        result_dict[str(idx)] = results[idx][2]
+    with open(os.path.join(self.output_dir,f'results{self.run}.json'), "w") as f:
+        json.dump(result_dict, f, indent=4)
 
 
 
