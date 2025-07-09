@@ -2,9 +2,55 @@ import torch
 import os
 import sys
 import numpy as np
+from scipy import stats
 import pandas as pd
 from collections import OrderedDict
 import matplotlib.pyplot as plt
+import json
+
+#The followingb function is required for calculating confidence scores of our chosen methods
+def calculate_confidence_scores(method_name):
+
+  conf_json_path = 'outputs/conf.json'
+  
+  if os.path.exists(conf_json_path):
+    with open(conf_json_path, 'r') as file:
+      data = json.load(file)
+  else:
+    data = {}
+  
+  data[method_name] = {}
+
+  results = []
+  num_clients = 3
+  num_runs = 5
+  dice_score_dict = {}
+  
+  for idx in range(num_clients):
+    dice_score_dict[idx] = []
+    for ix in range(num_runs):
+      dice_json_path = os.path.join('outputs',method_name,f'results{ix+1}.json')
+      with open(dice_json_path, 'r') as file:
+        dice_score = json.load(file)
+        
+        dice_score_dict[idx].append(dice_score[str(idx)])
+
+  for ix in range(num_clients):
+    mean = np.mean(dice_score_dict[ix])
+    sem = stats.sem(dice_score_dict[ix])
+    confidence = 0.95
+    n = len(dice_score_dict[ix])
+    df = n - 1
+    t_critical = stats.t.ppf((1 + confidence) / 2, df)
+    margin_of_error = t_critical * sem
+    lower_bound = mean - margin_of_error
+    upper_bound = mean + margin_of_error
+    data[method_name][str(ix)] = f'The {method_name} has dice score {round(mean,4)} +- {round(upper_bound-mean,4)} with 95\% conf score'
+  
+  with open('outputs/conf.json', 'w') as file:
+    json.dump(data, file)
+
+  return data
 
 #The following function is required for IGC in FedDP
 @torch.no_grad()
@@ -152,3 +198,9 @@ class AvgMeter():
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+
+if __name__ == '__main__':
+  method_names = ['fedAVG', 'fedAVGM', 'fedADAGRAD', 'fedPER', 'fedREP','fedDP', 'fedOAP']
+  for name in method_names:
+    calculate_confidence_scores(name)

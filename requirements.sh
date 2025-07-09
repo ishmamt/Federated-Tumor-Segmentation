@@ -9,3 +9,4 @@ pip install h5py
 pip install gdown
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 conda install -c conda-forge unzip -y
+pip install scipy

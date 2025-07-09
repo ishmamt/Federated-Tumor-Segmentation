@@ -858,6 +858,9 @@ if __name__ == "__main__":
   parser.add_argument('--strategy', type=str, required=True, help='Defining strategy like fedAvg or fedDP')
   parser.add_argument('--conf-path',type=str, default='conf', help='Defining path for configs dir')
   parser.add_argument('--run',type=int, default=0, help='Defining on which run the algorithm is')
+  parser.add_argument(
+    '--just-conf',type=bool, default=False, help='Asking if we just need to calculate the confidence scores'
+  )
   # parser.add_argument('--score', type=float, required=True, help='A float value')
 
   args = parser.parse_args()
@@ -869,19 +872,23 @@ if __name__ == "__main__":
   with open(os.path.join(args.conf_path,f"{args.strategy}.yaml"), "r") as f:
     cfg = yaml.safe_load(f)
 
-  if args.strategy == 'fedOAP': 
-    mainFedOAP(args,cfg)
-  elif args.strategy == 'fedDP':
-    mainFedDP(args,cfg)
-  elif args.strategy == 'fedREP':
-    mainFedREP(args,cfg)
-  elif args.strategy == 'fedPER':
-    mainFedPER(args,cfg)
-  elif args.strategy == 'fedAVG':
-    mainFedAVG(args,cfg)
-  elif args.strategy == 'fedAVGM':
-    mainFedAVGM(args,cfg)
-  elif args.strategy == 'fedADAGRAD':
-    mainFedADAGRAD(args,cfg)
-  else :
-    print('The given strategy is not yet implemented.')
+  if args.just_conf == False:
+
+    if args.strategy == 'fedOAP': 
+      mainFedOAP(args,cfg)
+    elif args.strategy == 'fedDP':
+      mainFedDP(args,cfg)
+    elif args.strategy == 'fedREP':
+      mainFedREP(args,cfg)
+    elif args.strategy == 'fedPER':
+      mainFedPER(args,cfg)
+    elif args.strategy == 'fedAVG':
+      mainFedAVG(args,cfg)
+    elif args.strategy == 'fedAVGM':
+      mainFedAVGM(args,cfg)
+    elif args.strategy == 'fedADAGRAD':
+      mainFedADAGRAD(args,cfg)
+    else :
+      print('The given strategy is not yet implemented.')
+
+  
