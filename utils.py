@@ -52,6 +52,18 @@ def calculate_confidence_scores(method_name):
 
   return data
 
+
+def convert_json_dict_to_txt(json_file_path):
+    with open(json_file_path, 'r') as file:
+      data = json.load(file)
+
+    with open('outputs/conf_score.txt','w') as f:
+        for outer_key in data:
+            for inner_key in data[outer_key]:
+                f.write(f'{data[outer_key][inner_key]} for client {inner_key}\n')
+            
+
+
 #The following function is required for IGC in FedDP
 @torch.no_grad()
 def compute_pred_uncertainty(net_clients, images):
@@ -201,6 +213,7 @@ class AvgMeter():
 
 
 if __name__ == '__main__':
-  method_names = ['fedAVG', 'fedAVGM', 'fedADAGRAD', 'fedPER', 'fedREP','fedDP', 'fedOAP']
-  for name in method_names:
-    calculate_confidence_scores(name)
+  # method_names = ['fedAVG', 'fedAVGM', 'fedADAGRAD', 'fedPER', 'fedREP','fedDP', 'fedOAP']
+  # for name in method_names:
+  #   calculate_confidence_scores(name)
+  convert_json_dict_to_txt('outputs/conf.json')
