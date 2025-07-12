@@ -16,7 +16,8 @@ from models.fedDP import UNetWithAttention
 from models.fedREP import UnetFedRep
 from datasets.dataset import prepare_datasets, load_datasets
 
-
+USE_FEDOAP_FINETUNE = True
+NOT_USE_FEDOAP_PERSONALISED = False
 
 class FinetuneFedOAP():
   def __init__(self,
@@ -69,6 +70,10 @@ class FinetuneFedOAP():
       else:
         log(INFO, f"server weights for client {idx} is not found")
 
+      if NOT_USE_FEDOAP_PERSONALISED:
+        clients.append(client)
+        continue
+      
       bottleneckQPath = os.path.join(self.output_dir,f'fedOAPbottleneckQ{idx}.pth')
       if os.path.exists(bottleneckQPath):
         log(INFO, f'loading bottleneckQ weights for client {idx}')
@@ -219,9 +224,10 @@ class FinetuneFedOAP():
     for idx in range(self.num_clients):
       criterion = BCEDiceLoss()
       test_avg_meters = {"loss": AvgMeter(), "iou": AvgMeter(), "dice": AvgMeter()}
-      self.clients[idx].load_state_dict(
-        torch.load(os.path.join(self.output_dir,f'fedOAPfinetuned{idx}.pth'))
-      )
+      if USE_FEDOAP_FINETUNE:
+        self.clients[idx].load_state_dict(
+          torch.load(os.path.join(self.output_dir,f'fedOAPfinetuned{idx}.pth'))
+        )
       self.clients[idx].eval()
       self.clients[idx].to(self.device)
       

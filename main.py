@@ -26,6 +26,7 @@ from models.fedPER import UnetFedPer
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+USE_FEDOAP_FINETUNE = True
 
 def mainFedOAP(args,cfg):
   # Parse config file and print it out
@@ -130,7 +131,9 @@ def mainFedOAP(args,cfg):
       run=args.run
     )
 
-    trainer.train()
+    if USE_FEDOAP_FINETUNE:
+      trainer.train()
+    
     trainer.test()
   except Exception as e:
     log(INFO, f"While finetuning an error has occured : {e}")
@@ -860,7 +863,7 @@ if __name__ == "__main__":
   parser.add_argument('--run',type=int, default=0, help='Defining on which run the algorithm is')
   parser.add_argument(
     '--just-conf',type=bool, default=False, help='Asking if we just need to calculate the confidence scores'
-  )
+  )  
   # parser.add_argument('--score', type=float, required=True, help='A float value')
 
   args = parser.parse_args()

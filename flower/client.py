@@ -15,6 +15,8 @@ from models.fedDP import UNetWithAttention
 from models.fedOAP import UNetWithCrossAttention
 from train import train, test, fedrep_train, fedrep_test
 
+USE_PERSONALIZED_PARAMETERS = True
+
 class FlowerClientFedOAP(fl.client.NumPyClient):
   def __init__(self, client_id, train_dataloader, val_dataloader, input_channels, num_classes, output_dir, random_seed=42):
       """
@@ -132,7 +134,8 @@ class FlowerClientFedOAP(fl.client.NumPyClient):
       """
       
       self.set_parameters(params)  # Update model parameters from the server
-      self.setPersonalizedParameters()
+      if USE_PERSONALIZED_PARAMETERS:
+          self.setPersonalizedParameters()
 
       optimizer = AdamW(self.model.parameters(), lr=cfg['lr'], weight_decay=cfg['weight_decay'])
       scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
@@ -151,8 +154,9 @@ class FlowerClientFedOAP(fl.client.NumPyClient):
           epochs = cfg["local_epochs"], 
           device = self.device
         )
-      
-      self.getPersonalizedParameters()
+
+      if USE_PERSONALIZED_PARAMETERS:
+          self.getPersonalizedParameters()
       self.saveServerModel()
 
       # Length of dataloader is for FedAVG, dict is for any additional info sent to the server
@@ -173,7 +177,8 @@ class FlowerClientFedOAP(fl.client.NumPyClient):
       """
       
       self.set_parameters(params)  # Update model parameters from the server
-      self.setPersonalizedParameters()
+      if USE_PERSONALIZED_PARAMETERS:
+          self.setPersonalizedParameters()
       
       loss, iou, dice = test(
         self.model, 

@@ -4,7 +4,7 @@ from PIL import Image
 import os
 import pandas as pd
 from PIL import Image
-import torchvision.transforms as transforms
+# import torchvision.transforms as transforms
 
 import glob
 import cv2

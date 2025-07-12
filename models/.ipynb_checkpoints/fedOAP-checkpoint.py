@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+USE_CROSS_ATTENTION = True
+USE_SPATIAL_ADAPTER = True
+
 class CrossAttention(nn.Module):
     def __init__(self, in_channels, attn_dim=None, num_heads=8):
         super(CrossAttention, self).__init__()
@@ -130,16 +133,20 @@ class UNetWithCrossAttention(nn.Module):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.bottleneckQ(x4)
-        x6 = self.bottleneckKV(x4)
+        
 
-        x5 = self.cross_attn(x5, x6)  # cross-attention between bottleneck and deepest skip
-
-        x = self.up1(x5, x4)
+        if USE_CROSS_ATTENTION:
+          x6 = self.bottleneckKV(x4)
+          x5 = self.cross_attn(x5, x6)  # cross-attention between bottleneck and deepest skip
+        #Even if we don't use cross attention we can use bottleneckQ as a simple bottleneck layer  
+        x = self.up1(x5,x4)
         x = self.up2(x, x3)
         x = self.up3(x, x2)
         x = self.up4(x, x1)
 
-        x = self.adapter(x)
+        if USE_SPATIAL_ADAPTER:
+          x = self.adapter(x)
+          
         return self.outc(x)
 
 # --- Example test run ---
