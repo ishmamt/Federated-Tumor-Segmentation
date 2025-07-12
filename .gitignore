@@ -19,6 +19,8 @@ CVC-ColonDB
 __pycache__
 *__pycache__
 resized_data
+lung_tumor_segmentation
+LungRDS
 
 # zipped dataset
 *.zip
